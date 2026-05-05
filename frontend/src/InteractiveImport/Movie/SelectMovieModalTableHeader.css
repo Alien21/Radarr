@@ -1,18 +1,38 @@
 .title {
   composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
 
-  flex: 4 0 140px;
+  flex: 3 0 130px;
 }
 
 .year {
-  composes: headerCell  from '~Components/Table/VirtualTableHeaderCell.css';
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
 
-  flex: 0 0 70px;
+  flex: 0 0 55px;
+}
+
+.fileName {
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
+
+  flex: 3 1 180px;
+}
+
+.size {
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
+
+  flex: 0 0 80px;
+}
+
+.audio,
+.subtitles {
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
+
+  flex: 1 0 105px;
+  min-width: 0;
 }
 
 .imdbId,
 .tmdbId {
-  composes: headerCell  from '~Components/Table/VirtualTableHeaderCell.css';
+  composes: headerCell from '~Components/Table/VirtualTableHeaderCell.css';
 
-  flex: 0 0 110px;
+  flex: 0 0 90px;
 }

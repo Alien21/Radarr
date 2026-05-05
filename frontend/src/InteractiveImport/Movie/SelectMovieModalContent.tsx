@@ -20,6 +20,8 @@ import VirtualTableRowButton from 'Components/Table/VirtualTableRowButton';
 import { scrollDirections } from 'Helpers/Props';
 import Movie from 'Movie/Movie';
 import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
+import createLanguagesSelector from 'Store/Selectors/createLanguagesSelector';
+import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
 import dimensions from 'Styles/Variables/dimensions';
 import { InputChanged } from 'typings/inputs';
 import sortByProp from 'Utilities/Array/sortByProp';
@@ -37,6 +39,26 @@ const columns = [
   {
     name: 'year',
     label: () => translate('Year'),
+    isVisible: true,
+  },
+  {
+    name: 'fileName',
+    label: () => translate('File'),
+    isVisible: true,
+  },
+  {
+    name: 'size',
+    label: () => translate('Size'),
+    isVisible: true,
+  },
+  {
+    name: 'audio',
+    label: () => 'Audio',
+    isVisible: true,
+  },
+  {
+    name: 'subtitles',
+    label: () => 'Subtitles',
     isVisible: true,
   },
   {
@@ -62,12 +84,17 @@ interface SelectMovieModalContentProps {
 interface RowItemData {
   items: Movie[];
   columns: Column[];
+  selectedMovieInfoLanguage: number;
+  languages: { id: number; name: string }[];
   onMovieSelect(movieId: number): void;
 }
 
 function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
-  const { items, onMovieSelect } = data;
+  const { items, languages, selectedMovieInfoLanguage, onMovieSelect } = data;
   const movie = index >= items.length ? null : items[index];
+  const selectedLanguage = languages.find(
+    (language) => language.id === selectedMovieInfoLanguage
+  );
 
   const handlePress = useCallback(() => {
     if (movie?.id) {
@@ -94,6 +121,8 @@ function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
         tmdbId={movie.tmdbId}
         imdbId={movie.imdbId}
         year={movie.year}
+        movieFile={movie.movieFile}
+        selectedLanguage={selectedLanguage}
       />
     </VirtualTableRowButton>
   );
@@ -105,6 +134,8 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
   const listRef = useRef<List<RowItemData>>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
+  const { movieInfoLanguage } = useSelector(createUISettingsSelector());
+  const { items: languages } = useSelector(createLanguagesSelector());
   const [filter, setFilter] = useState('');
   const [size, setSize] = useState({ width: 0, height: 0 });
   const windowHeight = window.innerHeight;
@@ -222,6 +253,8 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
               items,
               columns,
               onMovieSelect: onMovieSelectWrapper,
+              selectedMovieInfoLanguage: movieInfoLanguage,
+              languages,
             }}
           >
             {Row}
