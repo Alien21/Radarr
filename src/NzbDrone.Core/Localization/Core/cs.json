@@ -580,6 +580,7 @@
     "ExistingTag": "Stávající značka",
     "ExportCustomFormat": "Exportovat vlastní formát",
     "Extension": "Rozšíření",
+    "Extensions": "Rozšíření",
     "ExtraFileExtensionsHelpText": "Seznam extra souborů k importu oddělených čárkami (.nfo bude importován jako .nfo-orig)",
     "ExtraFileExtensionsHelpTextsExamples": "Příklady: „.sub, .nfo“ nebo „sub, nfo“",
     "FeatureRequests": "Žádosti o funkce",

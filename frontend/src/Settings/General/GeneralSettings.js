@@ -12,6 +12,7 @@ import SettingsToolbar from 'Settings/SettingsToolbar';
 import translate from 'Utilities/String/translate';
 import AnalyticSettings from './AnalyticSettings';
 import BackupSettings from './BackupSettings';
+import ExtensionsSettings from './ExtensionsSettings';
 import HostSettings from './HostSettings';
 import LoggingSettings from './LoggingSettings';
 import ProxySettings from './ProxySettings';
@@ -150,6 +151,8 @@ class GeneralSettings extends Component {
                   onInputChange={onInputChange}
                   onConfirmResetApiKey={onConfirmResetApiKey}
                 />
+
+                <ExtensionsSettings />
 
                 <ProxySettings
                   settings={settings}
