@@ -28,6 +28,7 @@ interface CssExports {
   'qualityProfileName': string;
   'rating': string;
   'runtime': string;
+  'secondaryTitle': string;
   'selectedTab': string;
   'sizeOnDisk': string;
   'statusName': string;
@@ -38,6 +39,7 @@ interface CssExports {
   'title': string;
   'titleContainer': string;
   'titleRow': string;
+  'titleTextContainer': string;
   'toggleMonitoredContainer': string;
   'year': string;
 }
