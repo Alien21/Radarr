@@ -68,6 +68,15 @@ namespace NzbDrone.Core.Test.ParserTests
             Parser.Parser.ParseMovieTitle(postTitle).PrimaryMovieTitle.Should().Be(title);
         }
 
+        [TestCase("Confidential.Informant.WEB-DL.CZ.2023.1080p.mkv", "Confidential Informant")]
+        [TestCase("Confidential.Informant", "Confidential Informant")]
+        [TestCase("mr.fox", "mr. fox")]
+        [TestCase("R.I.P.D.2013.720p.BluRay.x264-SPARKS", "R.I.P.D.")]
+        public void should_normalize_movie_lookup_term(string postTitle, string title)
+        {
+            Parser.Parser.NormalizeMovieLookupTerm(postTitle).Should().Be(title);
+        }
+
         [TestCase("[MTBB] Kimi no Na wa. (2016) v2 [97681524].mkv", "Kimi no Na wa", "MTBB", 2016)]
         [TestCase("[sam] Toward the Terra (1980) [BD 1080p TrueHD].mkv", "Toward the Terra", "sam", 1980)]
         public void should_parse_anime_movie_title(string postTitle, string title, string releaseGroup, int year)

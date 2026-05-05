@@ -8,6 +8,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Qualities;
 
 namespace NzbDrone.Core.Parser
 {
@@ -131,6 +132,8 @@ namespace NzbDrone.Core.Parser
         private static readonly Regex ArticleWordRegex = new Regex(@"^(a|an|the)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex SpecialEpisodeWordRegex = new Regex(@"\b(part|special|edition|christmas)\b\s?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex DuplicateSpacesRegex = new Regex(@"\s{2,}", RegexOptions.Compiled);
+        private static readonly Regex LookupAbbreviationRegex = new Regex(@"\b(mr|mrs|ms|dr|prof|st|jr|sr)\.(?=\S)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LookupSeparatorRegex = new Regex(@"\.(?=\S)", RegexOptions.Compiled);
 
         private static readonly Regex RequestInfoRegex = new Regex(@"^(?:\[.+?\])+", RegexOptions.Compiled);
 
@@ -467,6 +470,29 @@ namespace NzbDrone.Core.Parser
             return SimpleReleaseTitleRegex.Replace(title, string.Empty);
         }
 
+        public static string NormalizeMovieLookupTerm(string title, ParsedMovieInfo parsedMovieInfo = null)
+        {
+            if (title.IsNullOrWhiteSpace())
+            {
+                return title;
+            }
+
+            parsedMovieInfo ??= ParseMovieTitle(title, true);
+
+            if (parsedMovieInfo != null)
+            {
+                return TrimLookupReleaseSuffix(parsedMovieInfo.PrimaryMovieTitle);
+            }
+
+            var lookupTerm = FileExtensions.RemoveFileExtension(Path.GetFileName(title)).Replace('_', ' ');
+
+            lookupTerm = LookupAbbreviationRegex.Replace(lookupTerm, "$1. ");
+            lookupTerm = LookupSeparatorRegex.Replace(lookupTerm, " ");
+            lookupTerm = DuplicateSpacesRegex.Replace(lookupTerm, " ");
+
+            return lookupTerm.Trim();
+        }
+
         public static string ParseHardcodeSubs(string title)
         {
             var subMatch = HardcodedSubsRegex.Matches(title).OfType<Match>().LastOrDefault();
@@ -484,6 +510,23 @@ namespace NzbDrone.Core.Parser
             }
 
             return null;
+        }
+
+        private static string TrimLookupReleaseSuffix(string title)
+        {
+            var parts = title.Split(' ').Where(p => p.IsNotNullOrWhiteSpace()).ToList();
+
+            for (var i = parts.Count - 1; i > 0; i--)
+            {
+                var suffix = string.Join(" ", parts.Skip(i));
+
+                if (QualityParser.ParseQualityName(suffix).Quality != Quality.Unknown)
+                {
+                    return string.Join(" ", parts.Take(i));
+                }
+            }
+
+            return title;
         }
 
         public static bool HasMultipleLanguages(string title)
