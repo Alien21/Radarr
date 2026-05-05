@@ -182,6 +182,7 @@ namespace NzbDrone.Mono.Disk
             try
             {
                 mounts.AddRange(GetDriveInfoMounts()
+                    .Where(d => d.DriveType == DriveType.Fixed && !d.RootDirectory.FullName.StartsWithIgnoreCase("/run/"))
                     .Select(d =>
                     {
                         try
@@ -209,6 +210,12 @@ namespace NzbDrone.Mono.Disk
         protected override bool IsSpecialMount(IMount mount)
         {
             var root = mount.RootDirectory;
+
+            if (root.StartsWith("/run/"))
+            {
+                // Could not be /run/*
+                return true;
+            }
 
             if (root.StartsWith("/var/lib/"))
             {
