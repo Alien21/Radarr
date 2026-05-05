@@ -7,7 +7,14 @@ const fuseOptions = {
   ignoreLocation: true,
   threshold: 0.3,
   minMatchCharLength: 1,
-  keys: ['title', 'alternateTitles.title', 'tmdbId', 'imdbId', 'tags.label'],
+  keys: [
+    'title',
+    'originalTitle',
+    'alternateTitles.title',
+    'tmdbId',
+    'imdbId',
+    'tags.label',
+  ],
 };
 
 function getSuggestions(movies: SuggestedMovie[], value: string) {
@@ -17,7 +24,10 @@ function getSuggestions(movies: SuggestedMovie[], value: string) {
   if (value.length === 1) {
     for (let i = 0; i < movies.length; i++) {
       const m = movies[i];
-      if (m.firstCharacter === value.toLowerCase()) {
+      if (
+        m.firstCharacter === value.toLowerCase() ||
+        m.originalTitle?.charAt(0).toLowerCase() === value.toLowerCase()
+      ) {
         suggestions.push({
           item: movies[i],
           indices: [[0, 0]],
