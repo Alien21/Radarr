@@ -10,8 +10,8 @@ import { icons, kinds } from 'Helpers/Props';
 import { deleteRootFolder } from 'Store/Actions/rootFolderActions';
 import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
-import styles from './RootFolderRow.css';
 import SetRootFolderForAutoImportCallback from '../typings/SetRootFolderForAutoImportCallback';
+import styles from './RootFolderRow.css';
 
 interface RootFolderRowProps {
   id: number;
