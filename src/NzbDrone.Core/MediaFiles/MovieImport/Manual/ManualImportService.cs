@@ -467,6 +467,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 }
                 else
                 {
+                    UpdateTrackedDownloadForManualImport(trackedDownload, localMovie);
+
                     var importResult = _importApprovedMovie.Import(new List<ImportDecision> { importDecision }, true, trackedDownload.DownloadItem, message.ImportMode).First();
 
                     imported.Add(importResult);
@@ -504,6 +506,21 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                     _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, importMovie.Id));
                 }
             }
+        }
+
+        private void UpdateTrackedDownloadForManualImport(TrackedDownload trackedDownload, LocalMovie localMovie)
+        {
+            trackedDownload.RemoteMovie ??= new RemoteMovie();
+            trackedDownload.RemoteMovie.Movie = localMovie.Movie;
+            trackedDownload.RemoteMovie.ParsedMovieInfo ??= localMovie.FileMovieInfo;
+            trackedDownload.RemoteMovie.Languages = localMovie.Languages;
+            trackedDownload.RemoteMovie.CustomFormats = localMovie.CustomFormats;
+            trackedDownload.RemoteMovie.CustomFormatScore = localMovie.CustomFormatScore;
+
+            trackedDownload.ClearStatus();
+            trackedDownload.State = TrackedDownloadState.Importing;
+
+            _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(_trackedDownloadService.GetTrackedDownloads()));
         }
     }
 }
