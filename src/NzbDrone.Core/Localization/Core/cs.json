@@ -418,6 +418,8 @@
     "Proper": "Správně",
     "Protocol": "Protokol",
     "ProtocolHelpText": "Vyberte, které protokoly použít, a který je preferován při výběru mezi jinak stejnými verzemi",
+    "PreserveDownloadsForExistingMovies": "Zachovat stažené soubory pro existující filmy",
+    "PreserveDownloadsForExistingMoviesHelpText": "Když dokončené stahování odpovídá filmu, který už má soubor, zablokuje automatický import a nechá ho ve frontě pro ruční kontrolu.",
     "ProxyBypassFilterHelpText": "Použijte ',' jako oddělovač a '*.' jako zástupný znak pro subdomény",
     "AllowHardcodedSubsHelpText": "Zjištěné pevně zakódované odběry budou automaticky staženy",
     "QualityProfile": "Profil kvality",

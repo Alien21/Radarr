@@ -4,6 +4,7 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Disk;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
@@ -199,6 +200,23 @@ namespace NzbDrone.Core.Test.Download
             Subject.Import(_trackedDownload);
 
             AssertImported();
+        }
+
+        [Test]
+        public void should_block_auto_import_if_movie_already_has_file()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.BlockAutoImportForExistingMovieFiles)
+                .Returns(true);
+
+            _trackedDownload.RemoteMovie.Movie.MovieFileId = 1;
+
+            Subject.Import(_trackedDownload);
+
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Verify(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()), Times.Never());
+
+            AssertNotImported();
         }
 
         private void AssertNotImported()

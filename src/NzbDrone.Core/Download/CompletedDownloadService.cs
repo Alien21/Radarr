@@ -109,6 +109,11 @@ namespace NzbDrone.Core.Download
 
             if (movie != null)
             {
+                if (BlockAutoImportForExistingMovieFile(trackedDownload, movie))
+                {
+                    return;
+                }
+
                 AttachExistingMovie(trackedDownload, movie);
             }
 
@@ -117,6 +122,11 @@ namespace NzbDrone.Core.Download
                 movie = _movieService.GetMovie(historyItem.MovieId);
                 if (movie != null)
                 {
+                    if (BlockAutoImportForExistingMovieFile(trackedDownload, movie))
+                    {
+                        return;
+                    }
+
                     AttachExistingMovie(trackedDownload, movie);
                 }
             }
@@ -186,6 +196,11 @@ namespace NzbDrone.Core.Download
                 var existingMovie = _movieService.FindByTmdbId(movie.TmdbId);
                 if (existingMovie != null)
                 {
+                    if (BlockAutoImportForExistingMovieFile(trackedDownload, existingMovie))
+                    {
+                        return;
+                    }
+
                     _logger.Debug($"Joining movie '{movie.Title}' tmdbid: {movie.TmdbId} to existing movie '{existingMovie.Path}'");
 
                     AttachExistingMovie(trackedDownload, existingMovie);
@@ -259,6 +274,11 @@ namespace NzbDrone.Core.Download
                 trackedDownload.Warn("Unable to parse download, automatic import is not possible.");
                 SetStateToImportBlocked(trackedDownload);
 
+                return;
+            }
+
+            if (BlockAutoImportForExistingMovieFile(trackedDownload, trackedDownload.RemoteMovie.Movie))
+            {
                 return;
             }
 
@@ -401,6 +421,21 @@ namespace NzbDrone.Core.Download
             trackedDownload.ClearStatus();
 
             trackedDownload.State = TrackedDownloadState.ImportPending;
+        }
+
+        private bool BlockAutoImportForExistingMovieFile(TrackedDownload trackedDownload, Movie movie)
+        {
+            if (!_configService.BlockAutoImportForExistingMovieFiles || movie == null || !movie.HasFile)
+            {
+                return false;
+            }
+
+            EnsureRemoteMovie(trackedDownload, movie);
+
+            trackedDownload.Warn("Auto-import blocked: '{0}' already has a movie file in library (tmdbid: {1}).", movie.Title, movie.TmdbId);
+            _logger.Warn("Auto-import blocked: '{0}' tmdbid: {1} already has a movie file in library.", movie.Title, movie.TmdbId);
+            SetStateToImportBlocked(trackedDownload);
+            return true;
         }
 
         private void EnsureRemoteMovie(TrackedDownload trackedDownload, Movie movie)

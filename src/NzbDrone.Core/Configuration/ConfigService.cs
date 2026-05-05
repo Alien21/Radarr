@@ -431,6 +431,8 @@ namespace NzbDrone.Core.Configuration
 
         public string HmacSalt => GetValue("HmacSalt", Guid.NewGuid().ToString(), true);
 
+        public bool BlockAutoImportForExistingMovieFiles => GetValueBoolean("BlockAutoImportForExistingMovieFiles", false);
+
         public bool ProxyEnabled => GetValueBoolean("ProxyEnabled", false);
 
         public ProxyType ProxyType => GetValueEnum<ProxyType>("ProxyType", ProxyType.Http);

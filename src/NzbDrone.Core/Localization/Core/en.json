@@ -1523,6 +1523,8 @@
   "Proper": "Proper",
   "Protocol": "Protocol",
   "ProtocolHelpText": "Choose which protocol(s) to use and which one is preferred when choosing between otherwise equal releases",
+  "PreserveDownloadsForExistingMovies": "Preserve Downloads for Existing Movies",
+  "PreserveDownloadsForExistingMoviesHelpText": "When a completed download matches a movie that already has a file, block automatic import and leave it in the queue for manual review.",
   "Proxy": "Proxy",
   "ProxyBypassFilterHelpText": "Use ',' as a separator, and '*.' as a wildcard for subdomains",
   "ProxyCheckBadRequestMessage": "Failed to test proxy. StatusCode: {statusCode}",

@@ -152,7 +152,10 @@ class GeneralSettings extends Component {
                   onConfirmResetApiKey={onConfirmResetApiKey}
                 />
 
-                <ExtensionsSettings />
+                <ExtensionsSettings
+                  settings={settings}
+                  onInputChange={onInputChange}
+                />
 
                 <ProxySettings
                   settings={settings}

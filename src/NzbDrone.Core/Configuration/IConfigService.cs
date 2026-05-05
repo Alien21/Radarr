@@ -91,6 +91,9 @@ namespace NzbDrone.Core.Configuration
         string RijndaelSalt { get; }
         string HmacSalt { get; }
 
+        // Extensions
+        bool BlockAutoImportForExistingMovieFiles { get; }
+
         // Proxy
         bool ProxyEnabled { get; }
         ProxyType ProxyType { get; }
