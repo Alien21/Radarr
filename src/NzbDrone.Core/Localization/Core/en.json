@@ -70,6 +70,8 @@
   "Always": "Always",
   "AnalyseVideoFiles": "Analyze video files",
   "AnalyseVideoFilesHelpText": "Extract video information such as resolution, runtime and codec information from files. This requires {appName} to read parts of the file which may cause high disk or network activity during scans.",
+  "AnalyzeCompletedDownloadFiles": "Analyze Completed Download Files",
+  "AnalyzeCompletedDownloadFilesHelpText": "Analyze completed download files before import to refine queue quality and languages from the actual media file. Only completed downloads are analyzed, and each tracked download path is analyzed once.",
   "Analytics": "Analytics",
   "AnalyticsEnabledHelpText": "Send anonymous usage and error information to {appName}'s servers. This includes information on your browser, which {appName} WebUI pages you use, error reporting as well as OS and runtime version. We will use this information to prioritize features and bug fixes.",
   "Announced": "Announced",

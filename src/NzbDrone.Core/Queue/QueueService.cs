@@ -56,10 +56,22 @@ namespace NzbDrone.Core.Queue
 
         private Queue MapMovie(TrackedDownload trackedDownload, Movie movie)
         {
+            var languages = trackedDownload.RemoteMovie?.Languages;
+            if (languages == null || !languages.Any() || languages.All(l => l == Language.Unknown))
+            {
+                languages = trackedDownload.AnalyzedLanguages;
+            }
+
+            var quality = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Quality;
+            if (quality == null || quality.Quality == Quality.Unknown)
+            {
+                quality = trackedDownload.AnalyzedQuality;
+            }
+
             var queue = new Queue
             {
-                Languages = trackedDownload.RemoteMovie?.Languages ?? new List<Language> { Language.Unknown },
-                Quality = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Quality ?? new QualityModel(Quality.Unknown),
+                Languages = languages ?? new List<Language> { Language.Unknown },
+                Quality = quality ?? new QualityModel(Quality.Unknown),
                 Title = trackedDownload.DownloadItem.Title,
                 Size = trackedDownload.DownloadItem.TotalSize,
                 SizeLeft = trackedDownload.DownloadItem.RemainingSize,

@@ -2,20 +2,25 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NLog;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download.TrackedDownloads;
+using NzbDrone.Core.Extras.Subtitles;
 using NzbDrone.Core.History;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
+using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.Qualities;
+using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Tags;
 
 namespace NzbDrone.Core.Download
@@ -33,6 +38,10 @@ namespace NzbDrone.Core.Download
         private readonly IHistoryService _historyService;
         private readonly IProvideImportItemService _provideImportItemService;
         private readonly IDownloadedMovieImportService _downloadedMovieImportService;
+        private readonly IDiskProvider _diskProvider;
+        private readonly IDiskScanService _diskScanService;
+        private readonly IMakeImportDecision _importDecisionMaker;
+        private readonly IAggregationService _aggregationService;
         private readonly IParsingService _parsingService;
         private readonly IMovieService _movieService;
         private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
@@ -48,6 +57,10 @@ namespace NzbDrone.Core.Download
                                         IHistoryService historyService,
                                         IProvideImportItemService provideImportItemService,
                                         IDownloadedMovieImportService downloadedMovieImportService,
+                                        IDiskProvider diskProvider,
+                                        IDiskScanService diskScanService,
+                                        IMakeImportDecision importDecisionMaker,
+                                        IAggregationService aggregationService,
                                         IParsingService parsingService,
                                         IMovieService movieService,
                                         ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
@@ -63,6 +76,10 @@ namespace NzbDrone.Core.Download
             _historyService = historyService;
             _provideImportItemService = provideImportItemService;
             _downloadedMovieImportService = downloadedMovieImportService;
+            _diskProvider = diskProvider;
+            _diskScanService = diskScanService;
+            _importDecisionMaker = importDecisionMaker;
+            _aggregationService = aggregationService;
             _parsingService = parsingService;
             _movieService = movieService;
             _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
@@ -104,6 +121,8 @@ namespace NzbDrone.Core.Download
             {
                 return;
             }
+
+            AnalyzeCompletedDownloadFile(trackedDownload);
 
             var movie = _parsingService.GetMovie(trackedDownload.DownloadItem.Title);
 
@@ -227,6 +246,7 @@ namespace NzbDrone.Core.Download
                     _logger.Debug($"Joining movie '{movie.Title}' tmdbid: {movie.TmdbId} to existing movie '{existingMovie.Path}'");
 
                     AttachExistingMovie(trackedDownload, existingMovie);
+                    AnalyzeCompletedDownloadFile(trackedDownload);
                     return;
                 }
 
@@ -279,6 +299,8 @@ namespace NzbDrone.Core.Download
             }
 
             _logger.Debug($"Set State='{TrackedDownloadState.ImportPending}' for movie '{movie.Title}' tmdbid: {movie.TmdbId}");
+
+            AnalyzeCompletedDownloadFile(trackedDownload);
 
             trackedDownload.State = TrackedDownloadState.ImportPending;
         }
@@ -455,10 +477,311 @@ namespace NzbDrone.Core.Download
 
             EnsureRemoteMovie(trackedDownload, movie);
 
+            AnalyzeCompletedDownloadFile(trackedDownload);
+
             trackedDownload.Warn("Auto-import blocked: '{0}' already has a movie file in library (tmdbid: {1}).", movie.Title, movie.TmdbId);
             _logger.Warn("Auto-import blocked: '{0}' tmdbid: {1} already has a movie file in library.", movie.Title, movie.TmdbId);
             SetStateToImportBlocked(trackedDownload);
             return true;
+        }
+
+        private void AnalyzeCompletedDownloadFile(TrackedDownload trackedDownload)
+        {
+            if (!_configService.AnalyzeCompletedDownloadFiles ||
+                trackedDownload.DownloadItem.Status != DownloadItemStatus.Completed ||
+                trackedDownload.ImportItem == null)
+            {
+                return;
+            }
+
+            var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
+
+            if (outputPath.IsNullOrWhiteSpace() ||
+                trackedDownload.AnalyzedMediaInfoPath?.Equals(outputPath) == true)
+            {
+                return;
+            }
+
+            trackedDownload.AnalyzedMediaInfoPath = outputPath;
+
+            try
+            {
+                var movie = trackedDownload.RemoteMovie?.Movie;
+                var localMovie = movie == null
+                    ? GetCompletedDownloadQueueMovie(trackedDownload, outputPath)
+                    : SelectQueueMediaInfoMovie(GetCompletedDownloadImportDecisions(trackedDownload, movie, outputPath), movie);
+
+                if (localMovie == null)
+                {
+                    _logger.Debug("Completed download file analysis did not find a media file for queue item '{0}'", trackedDownload.DownloadItem.Title);
+                    return;
+                }
+
+                ApplyCompletedDownloadFileAnalysis(trackedDownload, localMovie);
+
+                var externalSubtitles = GetExternalSubtitleFiles(localMovie);
+                var mediaInfo = localMovie.MediaInfo;
+
+                _logger.Debug("Completed download file analysis updated queue item '{0}' from file '{1}'. Quality: '{2}', queue languages: '{3}', media title: '{4}', embedded audio: '{5}', embedded subtitles: '{6}', external subtitles: '{7}'",
+                    trackedDownload.DownloadItem.Title,
+                    localMovie.Path,
+                    localMovie.Quality,
+                    FormatValues(localMovie.Languages),
+                    mediaInfo?.Title ?? "none",
+                    FormatValues(mediaInfo?.AudioLanguages),
+                    FormatValues(mediaInfo?.Subtitles),
+                    FormatExternalSubtitleFiles(externalSubtitles));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Warn(ex, "Unable to analyze completed download file for queue item '{0}'", trackedDownload.DownloadItem.Title);
+            }
+        }
+
+        private void ApplyCompletedDownloadFileAnalysis(TrackedDownload trackedDownload, LocalMovie localMovie)
+        {
+            if (localMovie.Quality?.Quality != Quality.Unknown)
+            {
+                trackedDownload.AnalyzedQuality = localMovie.Quality;
+            }
+
+            if (localMovie.Languages?.Any(l => l != Language.Unknown) == true)
+            {
+                trackedDownload.AnalyzedLanguages = localMovie.Languages;
+            }
+
+            if (trackedDownload.RemoteMovie != null)
+            {
+                if (trackedDownload.RemoteMovie.ParsedMovieInfo == null)
+                {
+                    trackedDownload.RemoteMovie.ParsedMovieInfo = new ParsedMovieInfo
+                    {
+                        ReleaseTitle = trackedDownload.DownloadItem.Title
+                    };
+                }
+
+                if (localMovie.Quality?.Quality != Quality.Unknown)
+                {
+                    trackedDownload.RemoteMovie.ParsedMovieInfo.Quality = localMovie.Quality;
+                }
+
+                if (localMovie.Languages?.Any(l => l != Language.Unknown) == true)
+                {
+                    trackedDownload.RemoteMovie.Languages = localMovie.Languages;
+                    trackedDownload.RemoteMovie.ParsedMovieInfo.Languages = localMovie.Languages;
+                }
+            }
+        }
+
+        private LocalMovie GetCompletedDownloadQueueMovie(TrackedDownload trackedDownload, string outputPath)
+        {
+            if (_diskProvider.FolderExists(outputPath))
+            {
+                var directoryInfo = new DirectoryInfo(outputPath);
+                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name));
+                var videoFiles = _diskScanService.FilterPaths(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName)).ToList();
+
+                return videoFiles
+                    .Select(videoFile => GetCompletedDownloadQueueMovie(trackedDownload, videoFile, folderInfo))
+                    .Where(localMovie => localMovie?.MediaInfo != null)
+                    .OrderByDescending(localMovie => localMovie.Size)
+                    .FirstOrDefault();
+            }
+
+            if (_diskProvider.FileExists(outputPath) &&
+                MediaFileExtensions.Extensions.Contains(Path.GetExtension(outputPath)))
+            {
+                return GetCompletedDownloadQueueMovie(trackedDownload, outputPath, null);
+            }
+
+            return null;
+        }
+
+        private LocalMovie GetCompletedDownloadQueueMovie(TrackedDownload trackedDownload, string videoFile, ParsedMovieInfo folderInfo)
+        {
+            var fileInfo = Parser.Parser.ParseMoviePath(videoFile);
+
+            var localMovie = new LocalMovie
+            {
+                Path = videoFile,
+                DownloadItem = trackedDownload.ImportItem,
+                DownloadClientMovieInfo = trackedDownload.RemoteMovie?.ParsedMovieInfo,
+                FolderMovieInfo = folderInfo,
+                FileMovieInfo = fileInfo ?? GetFallbackFileMovieInfo(videoFile)
+            };
+
+            return _aggregationService.Augment(localMovie, trackedDownload.ImportItem);
+        }
+
+        private ParsedMovieInfo GetFallbackFileMovieInfo(string path)
+        {
+            return new ParsedMovieInfo
+            {
+                ReleaseTitle = Path.GetFileNameWithoutExtension(path),
+                SimpleReleaseTitle = Path.GetFileNameWithoutExtension(path),
+                Quality = QualityParser.ParseQuality(path),
+                Languages = LanguageParser.ParseLanguages(path)
+            };
+        }
+
+        private List<ImportDecision> GetCompletedDownloadImportDecisions(TrackedDownload trackedDownload, Movie movie, string outputPath)
+        {
+            if (_diskProvider.FolderExists(outputPath))
+            {
+                var directoryInfo = new DirectoryInfo(outputPath);
+                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name));
+                var videoFiles = _diskScanService.FilterPaths(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName)).ToList();
+
+                return _importDecisionMaker.GetImportDecisions(videoFiles, movie, trackedDownload.ImportItem, folderInfo, true);
+            }
+
+            if (_diskProvider.FileExists(outputPath) &&
+                MediaFileExtensions.Extensions.Contains(Path.GetExtension(outputPath)))
+            {
+                return _importDecisionMaker.GetImportDecisions(new List<string> { outputPath }, movie, trackedDownload.ImportItem, null, true);
+            }
+
+            return new List<ImportDecision>();
+        }
+
+        private LocalMovie SelectQueueMediaInfoMovie(List<ImportDecision> decisions, Movie movie)
+        {
+            var approvedDecisions = decisions.Where(decision => decision.Approved).ToList();
+
+            if (approvedDecisions.Any())
+            {
+                if (movie.QualityProfile != null)
+                {
+                    return approvedDecisions
+                        .OrderByDescending(decision => decision.LocalMovie.Quality ?? new QualityModel { Quality = Quality.Unknown }, new QualityModelComparer(movie.QualityProfile))
+                        .ThenByDescending(decision => decision.LocalMovie.Size)
+                        .First()
+                        .LocalMovie;
+                }
+
+                return approvedDecisions
+                    .OrderByDescending(decision => decision.LocalMovie.Size)
+                    .First()
+                    .LocalMovie;
+            }
+
+            return decisions
+                .Where(decision => decision.LocalMovie?.MediaInfo != null)
+                .OrderByDescending(decision => decision.LocalMovie.Size)
+                .FirstOrDefault()
+                ?.LocalMovie;
+        }
+
+        private List<ExternalSubtitleFile> GetExternalSubtitleFiles(LocalMovie localMovie)
+        {
+            if (localMovie?.Path.IsNullOrWhiteSpace() != false)
+            {
+                return new List<ExternalSubtitleFile>();
+            }
+
+            var sourceFolder = _diskProvider.GetParentFolder(localMovie.Path);
+
+            if (sourceFolder.IsNullOrWhiteSpace() || !_diskProvider.FolderExists(sourceFolder))
+            {
+                return new List<ExternalSubtitleFile>();
+            }
+
+            var subtitleFiles = _diskProvider.GetFiles(sourceFolder, false)
+                                             .Where(file => SubtitleFileExtensions.Extensions.Contains(Path.GetExtension(file)))
+                                             .ToList();
+
+            if (subtitleFiles.Empty())
+            {
+                return new List<ExternalSubtitleFile>();
+            }
+
+            var sourceFileName = Path.GetFileNameWithoutExtension(localMovie.Path);
+            var matchingFiles = subtitleFiles
+                .Where(file => Path.GetFileNameWithoutExtension(file).StartsWithIgnoreCase(sourceFileName))
+                .ToList();
+
+            if (matchingFiles.Empty() && localMovie.FileMovieInfo != null)
+            {
+                matchingFiles = subtitleFiles
+                    .Where(file =>
+                    {
+                        var fileMovieInfo = Parser.Parser.ParseMoviePath(file);
+
+                        return fileMovieInfo?.MovieTitle == localMovie.FileMovieInfo.MovieTitle &&
+                               fileMovieInfo.Year.Equals(localMovie.FileMovieInfo.Year);
+                    })
+                    .ToList();
+            }
+
+            if (matchingFiles.Empty())
+            {
+                var videoFiles = _diskProvider.GetFiles(sourceFolder, false)
+                                              .Where(file => MediaFileExtensions.Extensions.Contains(Path.GetExtension(file)))
+                                              .ToList();
+
+                if (videoFiles.Count == 1)
+                {
+                    matchingFiles = subtitleFiles;
+                }
+            }
+
+            return matchingFiles
+                .Select(file => new ExternalSubtitleFile
+                {
+                    Path = file,
+                    Info = LanguageParser.ParseSubtitleLanguageInformation(file)
+                })
+                .ToList();
+        }
+
+        private string FormatValues<T>(IEnumerable<T> values)
+        {
+            var formattedValues = values?.Select(value => value?.ToString())
+                                         .Where(value => value.IsNotNullOrWhiteSpace())
+                                         .Distinct()
+                                         .ToList();
+
+            return formattedValues?.Any() == true ? string.Join(", ", formattedValues) : "none";
+        }
+
+        private string FormatExternalSubtitleFiles(List<ExternalSubtitleFile> subtitleFiles)
+        {
+            if (subtitleFiles.Empty())
+            {
+                return "none";
+            }
+
+            return string.Join("; ", subtitleFiles.Select(file =>
+            {
+                var info = file.Info;
+                var details = new List<string>
+                {
+                    $"language: {info.Language}"
+                };
+
+                if (info.LanguageTags?.Any() == true)
+                {
+                    details.Add($"tags: {string.Join(", ", info.LanguageTags)}");
+                }
+
+                if (info.Title.IsNotNullOrWhiteSpace())
+                {
+                    details.Add($"title: {info.Title}");
+                }
+
+                if (info.Copy > 0)
+                {
+                    details.Add($"copy: {info.Copy}");
+                }
+
+                return $"{file.Path} [{string.Join(", ", details)}]";
+            }));
+        }
+
+        private string GetCleanedUpFolderName(string folder)
+        {
+            return folder.Replace("_UNPACK_", "")
+                         .Replace("_FAILED_", "");
         }
 
         private void EnsureRemoteMovie(TrackedDownload trackedDownload, Movie movie)
@@ -495,6 +818,12 @@ namespace NzbDrone.Core.Download
             }
 
             return true;
+        }
+
+        private class ExternalSubtitleFile
+        {
+            public string Path { get; set; }
+            public SubtitleTitleInfo Info { get; set; }
         }
     }
 }

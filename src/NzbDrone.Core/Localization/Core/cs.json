@@ -55,6 +55,8 @@
     "EnableAutomaticAdd": "Povolit automatické přidání",
     "ListEnabledHelpText": "Povolte tento seznam pro použití v {appName}u",
     "AnalyseVideoFilesHelpText": "Extrahujte ze souborů informace o videu, jako je rozlišení, runtime a informace o kodeku. To vyžaduje, aby {appName} četl části souboru, což může během skenování způsobit vysokou aktivitu disku nebo sítě.",
+    "AnalyzeCompletedDownloadFiles": "Analyzovat dokončené stažené soubory",
+    "AnalyzeCompletedDownloadFilesHelpText": "Analyzuje dokončené stažené soubory před importem, aby se ve frontě zpřesnila kvalita a jazyky podle skutečného mediálního souboru. Analyzují se jen dokončená stahování a každá sledovaná cesta jen jednou.",
     "EnableSslHelpText": " Vyžaduje restartování spuštěné jako správce, aby se projevilo",
     "ErrorRestoringBackup": "Chyba při obnovování zálohy",
     "ExternalUpdater": "{appName} je nakonfigurován pro použití externího aktualizačního mechanismu",

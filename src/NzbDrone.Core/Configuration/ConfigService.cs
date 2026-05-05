@@ -433,6 +433,8 @@ namespace NzbDrone.Core.Configuration
 
         public bool BlockAutoImportForExistingMovieFiles => GetValueBoolean("BlockAutoImportForExistingMovieFiles", false);
 
+        public bool AnalyzeCompletedDownloadFiles => GetValueBoolean("AnalyzeCompletedDownloadFiles", false);
+
         public bool ProxyEnabled => GetValueBoolean("ProxyEnabled", false);
 
         public ProxyType ProxyType => GetValueEnum<ProxyType>("ProxyType", ProxyType.Http);

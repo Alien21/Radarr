@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Qualities;
 
 namespace NzbDrone.Core.Download.TrackedDownloads
 {
@@ -18,6 +21,9 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         public DateTime? Added { get; set; }
         public bool IsTrackable { get; set; }
         public bool HasNotifiedManualInteractionRequired { get; set; }
+        public string AnalyzedMediaInfoPath { get; set; }
+        public QualityModel AnalyzedQuality { get; set; }
+        public List<Language> AnalyzedLanguages { get; set; }
 
         public TrackedDownload()
         {

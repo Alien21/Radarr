@@ -34,6 +34,7 @@ namespace Radarr.Api.V3.Config
         public UpdateMechanism UpdateMechanism { get; set; }
         public string UpdateScriptPath { get; set; }
         public bool BlockAutoImportForExistingMovieFiles { get; set; }
+        public bool AnalyzeCompletedDownloadFiles { get; set; }
         public bool ProxyEnabled { get; set; }
         public ProxyType ProxyType { get; set; }
         public string ProxyHostname { get; set; }
@@ -80,6 +81,7 @@ namespace Radarr.Api.V3.Config
                 UpdateMechanism = model.UpdateMechanism,
                 UpdateScriptPath = model.UpdateScriptPath,
                 BlockAutoImportForExistingMovieFiles = configService.BlockAutoImportForExistingMovieFiles,
+                AnalyzeCompletedDownloadFiles = configService.AnalyzeCompletedDownloadFiles,
                 ProxyEnabled = configService.ProxyEnabled,
                 ProxyType = configService.ProxyType,
                 ProxyHostname = configService.ProxyHostname,

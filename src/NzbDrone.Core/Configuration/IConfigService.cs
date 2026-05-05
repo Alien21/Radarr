@@ -93,6 +93,7 @@ namespace NzbDrone.Core.Configuration
 
         // Extensions
         bool BlockAutoImportForExistingMovieFiles { get; }
+        bool AnalyzeCompletedDownloadFiles { get; }
 
         // Proxy
         bool ProxyEnabled { get; }

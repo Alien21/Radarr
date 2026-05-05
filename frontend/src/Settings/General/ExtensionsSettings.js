@@ -8,13 +8,11 @@ import { inputTypes, sizes } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
 function ExtensionsSettings(props) {
-  const {
-    settings,
-    onInputChange
-  } = props;
+  const { settings, onInputChange } = props;
 
   const {
-    blockAutoImportForExistingMovieFiles
+    blockAutoImportForExistingMovieFiles,
+    analyzeCompletedDownloadFiles
   } = settings;
 
   return (
@@ -28,6 +26,18 @@ function ExtensionsSettings(props) {
           helpText={translate('PreserveDownloadsForExistingMoviesHelpText')}
           onChange={onInputChange}
           {...blockAutoImportForExistingMovieFiles}
+        />
+      </FormGroup>
+
+      <FormGroup size={sizes.MEDIUM}>
+        <FormLabel>{translate('AnalyzeCompletedDownloadFiles')}</FormLabel>
+
+        <FormInputGroup
+          type={inputTypes.CHECK}
+          name="analyzeCompletedDownloadFiles"
+          helpText={translate('AnalyzeCompletedDownloadFilesHelpText')}
+          onChange={onInputChange}
+          {...analyzeCompletedDownloadFiles}
         />
       </FormGroup>
     </FieldSet>
