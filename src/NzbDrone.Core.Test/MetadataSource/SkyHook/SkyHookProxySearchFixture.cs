@@ -1,5 +1,7 @@
 using FluentAssertions;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.MetadataSource.SkyHook;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
@@ -32,6 +34,22 @@ namespace NzbDrone.Core.Test.MetadataSource.SkyHook
             result.Should().NotBeEmpty();
 
             result[0].Title.Should().Be(expected);
+
+            ExceptionVerification.IgnoreWarns();
+        }
+
+        [Test]
+        public void should_search_using_movie_info_language()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(s => s.MovieInfoLanguage)
+                .Returns((int)Language.Czech);
+
+            var result = Subject.SearchForNewMovie("Vykoupení z věznice Shawshank");
+
+            result.Should().NotBeEmpty();
+
+            result[0].TmdbId.Should().Be(278);
 
             ExceptionVerification.IgnoreWarns();
         }

@@ -339,6 +339,23 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             return title;
         }
 
+        private string GetMovieInfoLanguageCode()
+        {
+            var language = IsoLanguages.Get((Language)_configService.MovieInfoLanguage);
+
+            if (language == null)
+            {
+                return null;
+            }
+
+            if (language.CountryCode.IsNotNullOrWhiteSpace())
+            {
+                return $"{language.TwoLetterCode}-{language.CountryCode.ToUpperInvariant()}";
+            }
+
+            return language.TwoLetterCode;
+        }
+
         public MovieMetadata MapMovieToTmdbMovie(MovieMetadata movie)
         {
             try
@@ -426,16 +443,15 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
 
                 lowerTitle = lowerTitle.Replace(".", "");
 
-                var parserTitle = lowerTitle;
-
                 var parserResult = Parser.Parser.ParseMovieTitle(title, true);
+                var parserTitle = Parser.Parser.NormalizeMovieLookupTerm(title, parserResult).ToLower();
 
                 var yearTerm = "";
 
                 if (parserResult != null && parserResult.PrimaryMovieTitle != title)
                 {
                     // Parser found something interesting!
-                    parserTitle = parserResult.PrimaryMovieTitle.ToLower().Replace(".", " "); // TODO Update so not every period gets replaced (e.g. R.I.P.D.)
+                    parserTitle = parserTitle.Replace(".", " "); // TODO Update so not every period gets replaced (e.g. R.I.P.D.)
                     if (parserResult.Year > 1800)
                     {
                         yearTerm = parserResult.Year.ToString();
@@ -518,18 +534,42 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
 
                 var firstChar = searchTerm.First();
 
-                var request = _radarrMetadata.Create()
+                var requestBuilder = _radarrMetadata.Create()
                     .SetSegment("route", "search")
                     .AddQueryParam("q", searchTerm)
-                    .AddQueryParam("year", yearTerm)
-                    .Build();
+                    .AddQueryParam("year", yearTerm);
+
+                var request = requestBuilder.Build();
 
                 request.AllowAutoRedirect = true;
                 request.SuppressHttpError = true;
 
                 var httpResponse = _httpClient.Get<List<MovieResource>>(request);
+                var results = httpResponse.Resource;
 
-                return httpResponse.Resource.SelectList(MapSearchResult);
+                var movieInfoLanguage = GetMovieInfoLanguageCode();
+
+                if (movieInfoLanguage.IsNotNullOrWhiteSpace() && movieInfoLanguage != "en")
+                {
+                    var languageRequest = _radarrMetadata.Create()
+                        .SetSegment("route", "search")
+                        .AddQueryParam("q", searchTerm)
+                        .AddQueryParam("year", yearTerm)
+                        .AddQueryParam("language", movieInfoLanguage)
+                        .Build();
+
+                    languageRequest.AllowAutoRedirect = true;
+                    languageRequest.SuppressHttpError = true;
+
+                    var languageHttpResponse = _httpClient.Get<List<MovieResource>>(languageRequest);
+
+                    results = results
+                        .Concat(languageHttpResponse.Resource)
+                        .DistinctBy(m => m.TmdbId)
+                        .ToList();
+                }
+
+                return results.SelectList(MapSearchResult);
             }
             catch (HttpException ex)
             {
