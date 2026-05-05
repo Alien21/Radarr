@@ -20,6 +20,7 @@ using NzbDrone.Core.Movies.Collections;
 using NzbDrone.Core.Movies.Credits;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.Parser;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MetadataSource.SkyHook
 {
@@ -356,6 +357,142 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             return language.TwoLetterCode;
         }
 
+        private List<MovieResource> SearchMovieResources(string searchTerm, string yearTerm, string language = null)
+        {
+            var requestBuilder = _radarrMetadata.Create()
+                .SetSegment("route", "search")
+                .AddQueryParam("q", searchTerm)
+                .AddQueryParam("year", yearTerm);
+
+            if (language.IsNotNullOrWhiteSpace())
+            {
+                requestBuilder.AddQueryParam("language", language);
+            }
+
+            var request = requestBuilder.Build();
+
+            request.AllowAutoRedirect = true;
+            request.SuppressHttpError = true;
+
+            return _httpClient.Get<List<MovieResource>>(request).Resource;
+        }
+
+        private string GetExactSearchTitle(string title, ParsedMovieInfo parserResult = null)
+        {
+            var parserTitle = Parser.Parser.NormalizeMovieLookupTerm(title, parserResult).ToLower();
+
+            return StripTrailingTheFromTitle(parserTitle.Replace(".", " "));
+        }
+
+        private bool IsExactTitleMatch(string cleanTitle, string candidateTitle)
+        {
+            return candidateTitle.IsNotNullOrWhiteSpace() && candidateTitle.CleanMovieTitle() == cleanTitle;
+        }
+
+        private bool IsExactLocalizedTitleMatch(string cleanTitle, Language movieInfoLanguage, Movie movie)
+        {
+            var metadata = movie.MovieMetadata.Value;
+
+            if (IsExactTitleMatch(cleanTitle, metadata.Title))
+            {
+                return true;
+            }
+
+            return metadata.Translations?.Any(t =>
+                t.Language == movieInfoLanguage &&
+                IsExactTitleMatch(cleanTitle, t.Title)) == true;
+        }
+
+        private string FormatExactSearchMatches(IEnumerable<Movie> movies)
+        {
+            var matches = movies
+                .Select(m => $"{m.Title} / {m.MovieMetadata.Value.OriginalTitle} ({m.Year}) tmdbid: {m.TmdbId}")
+                .ToList();
+
+            return matches.Any() ? string.Join(", ", matches) : "none";
+        }
+
+        private string GetSearchTerm(string parserTitle)
+        {
+            return Regex.Replace(parserTitle, @"\s+", "+").Replace("_", "+").Replace(".", "+");
+        }
+
+        public Movie SearchForNewMovieByExactTitle(string title, int year, List<Movie> candidates)
+        {
+            try
+            {
+                var parserResult = Parser.Parser.ParseMovieTitle(title, true);
+
+                if (year <= 1800 && parserResult?.Year > 1800)
+                {
+                    year = parserResult.Year;
+                }
+
+                if (year <= 1800)
+                {
+                    return null;
+                }
+
+                var exactSearchTitle = GetExactSearchTitle(title, parserResult);
+                var cleanTitle = exactSearchTitle.CleanMovieTitle();
+
+                if (cleanTitle.IsNullOrWhiteSpace())
+                {
+                    return null;
+                }
+
+                var candidatesInYear = candidates.Where(m => m.Year == year).ToList();
+                var originalTitleMatches = candidatesInYear
+                    .Where(m => IsExactTitleMatch(cleanTitle, m.MovieMetadata.Value.OriginalTitle))
+                    .ToList();
+                var localizedTitleMatches = new List<Movie>();
+
+                var movieInfoLanguage = GetMovieInfoLanguageCode();
+                var movieInfoLanguageModel = (Language)_configService.MovieInfoLanguage;
+
+                if (movieInfoLanguage.IsNotNullOrWhiteSpace() && movieInfoLanguage != "en")
+                {
+                    localizedTitleMatches = candidatesInYear
+                        .Where(m => IsExactLocalizedTitleMatch(cleanTitle, movieInfoLanguageModel, m))
+                        .ToList();
+                }
+
+                var uniqueMatches = originalTitleMatches
+                    .Concat(localizedTitleMatches)
+                    .DistinctBy(m => m.TmdbId)
+                    .ToList();
+
+                _logger.Debug("Exact search for '{0}' normalized to '{1}' using language '{2}' found {3} original-title matches [{4}] and {5} localized-title matches [{6}] ({7} unique tmdb ids).",
+                    title,
+                    cleanTitle,
+                    movieInfoLanguage ?? "none",
+                    originalTitleMatches.Count,
+                    FormatExactSearchMatches(originalTitleMatches),
+                    localizedTitleMatches.Count,
+                    FormatExactSearchMatches(localizedTitleMatches),
+                    uniqueMatches.Count);
+
+                if (uniqueMatches.Count != 1)
+                {
+                    if (uniqueMatches.Count > 1)
+                    {
+                        _logger.Debug("Exact search for '{0}' refused automatic matching because multiple distinct movies matched across original and localized search branches: {1}",
+                            title,
+                            FormatExactSearchMatches(uniqueMatches));
+                    }
+
+                    return null;
+                }
+
+                return uniqueMatches.Single();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Exact search for '{0}' failed.", title);
+                return null;
+            }
+        }
+
         public MovieMetadata MapMovieToTmdbMovie(MovieMetadata movie)
         {
             try
@@ -530,41 +667,16 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
                     }
                 }
 
-                var searchTerm = Regex.Replace(parserTitle, @"\s+", "+").Replace("_", "+").Replace(".", "+");
+                var searchTerm = GetSearchTerm(parserTitle);
 
-                var firstChar = searchTerm.First();
-
-                var requestBuilder = _radarrMetadata.Create()
-                    .SetSegment("route", "search")
-                    .AddQueryParam("q", searchTerm)
-                    .AddQueryParam("year", yearTerm);
-
-                var request = requestBuilder.Build();
-
-                request.AllowAutoRedirect = true;
-                request.SuppressHttpError = true;
-
-                var httpResponse = _httpClient.Get<List<MovieResource>>(request);
-                var results = httpResponse.Resource;
+                var results = SearchMovieResources(searchTerm, yearTerm);
 
                 var movieInfoLanguage = GetMovieInfoLanguageCode();
 
                 if (movieInfoLanguage.IsNotNullOrWhiteSpace() && movieInfoLanguage != "en")
                 {
-                    var languageRequest = _radarrMetadata.Create()
-                        .SetSegment("route", "search")
-                        .AddQueryParam("q", searchTerm)
-                        .AddQueryParam("year", yearTerm)
-                        .AddQueryParam("language", movieInfoLanguage)
-                        .Build();
-
-                    languageRequest.AllowAutoRedirect = true;
-                    languageRequest.SuppressHttpError = true;
-
-                    var languageHttpResponse = _httpClient.Get<List<MovieResource>>(languageRequest);
-
                     results = results
-                        .Concat(languageHttpResponse.Resource)
+                        .Concat(SearchMovieResources(searchTerm, yearTerm, movieInfoLanguage))
                         .DistinctBy(m => m.TmdbId)
                         .ToList();
                 }

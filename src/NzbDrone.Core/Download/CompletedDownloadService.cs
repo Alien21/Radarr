@@ -180,9 +180,32 @@ namespace NzbDrone.Core.Download
 
                 var parsedYear = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Year;
 
-                if (parsedYear > 1890 && movies.Count(m => m.Year == parsedYear) == 1)
+                if (parsedYear > 1890)
                 {
-                    movie = movies.First(m => m.Year == parsedYear);
+                    var moviesInYear = movies.Where(m => m.Year == parsedYear).ToList();
+
+                    if (moviesInYear.Count == 1)
+                    {
+                        movie = moviesInYear.First();
+                    }
+                    else
+                    {
+                        _logger.Debug("Auto-import found {0} candidate movies for '{1}' in year {2}; trying exact original/localized title match.",
+                            moviesInYear.Count,
+                            trackedDownload.DownloadItem.Title,
+                            parsedYear);
+
+                        movie = _searchProxy.SearchForNewMovieByExactTitle(Path.GetFileName(trackedDownload.DownloadItem.Title), parsedYear.Value, moviesInYear);
+
+                        if (movie != null)
+                        {
+                            _logger.Debug("Auto-import exact title match for '{0}' resolved to '{1}' tmdbid: {2}", trackedDownload.DownloadItem.Title, movie.Title, movie.TmdbId);
+                        }
+                        else
+                        {
+                            _logger.Debug("Auto-import exact original/localized title match did not resolve '{0}' for year {1}.", trackedDownload.DownloadItem.Title, parsedYear);
+                        }
+                    }
                 }
 
                 if (movie == null)
