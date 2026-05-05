@@ -11,6 +11,7 @@ import { deleteRootFolder } from 'Store/Actions/rootFolderActions';
 import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import styles from './RootFolderRow.css';
+import SetRootFolderForAutoImportCallback from '../typings/SetRootFolderForAutoImportCallback';
 
 interface RootFolderRowProps {
   id: number;
@@ -18,10 +19,18 @@ interface RootFolderRowProps {
   accessible: boolean;
   freeSpace?: number;
   unmappedFolders: object[];
+  onSetRootFolderForAutoImportPress: SetRootFolderForAutoImportCallback;
 }
 
 function RootFolderRow(props: RootFolderRowProps) {
-  const { id, path, accessible, freeSpace = 0, unmappedFolders = [] } = props;
+  const {
+    id,
+    path,
+    accessible,
+    freeSpace = 0,
+    unmappedFolders = [],
+    onSetRootFolderForAutoImportPress,
+  } = props;
 
   const isUnavailable = !accessible;
 
@@ -43,8 +52,20 @@ function RootFolderRow(props: RootFolderRowProps) {
     setIsDeleteModalOpen(false);
   }, [dispatch, id]);
 
+  const handleSetRootFolderForAutoImportPress = useCallback(() => {
+    onSetRootFolderForAutoImportPress(path);
+  }, [onSetRootFolderForAutoImportPress, path]);
+
   return (
     <TableRow>
+      <TableRowCell className={styles.actions}>
+        <IconButton
+          title={translate('SetRootFolderForAutoImport')}
+          name={icons.FOLDER_PLUS}
+          onPress={handleSetRootFolderForAutoImportPress}
+        />
+      </TableRowCell>
+
       <TableRowCell>
         {isUnavailable ? (
           <div className={styles.unavailablePath}>

@@ -316,6 +316,11 @@
   "DefaultNameCopiedImportList": "{name} - Copy",
   "DefaultNameCopiedProfile": "{name} - Copy",
   "DefaultNameCopiedSpecification": "{name} - Copy",
+  "DefaultRootFolderForAutoImport": "Root folder for automatic import",
+  "DefaultRootFolderForAutoImportHelpText": "This root folder is used in automatic import",
+  "SetRootFolderForAutoImport": "Set this root folder as default folder for automatic import",
+  "DefaultProfileForAutoImport": "Quality profile for automatic import",
+  "AutoImport": "AutoImport",
   "DefaultNotFoundMessage": "You must be lost, nothing to see here.",
   "Delay": "Delay",
   "DelayMinutes": "{delay} Minutes",
@@ -1704,6 +1709,7 @@
   "RootFolderPath": "Root Folder Path",
   "RootFolderSelectFreeSpace": "{freeSpace} Free",
   "RootFolders": "Root Folders",
+  "NoRootFolders": "No Root Folders",
   "RootFoldersLoadError": "Unable to load root folders",
   "RottenTomatoesRating": "Tomato Rating",
   "Rss": "RSS",
@@ -2039,5 +2045,6 @@
   "YesCancel": "Yes, Cancel",
   "Yesterday": "Yesterday",
   "YesterdayAt": "Yesterday at {time}",
-  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`"
+  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`",
+  "DisableAutomaticImport": "Disable Automatic Import"
 }

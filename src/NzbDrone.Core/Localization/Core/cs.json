@@ -501,6 +501,11 @@
     "Debug": "Ladit",
     "DefaultCase": "Výchozí případ",
     "DefaultDelayProfileMovie": "Toto je výchozí profil. Platí pro všechny filmy, které nemají explicitní profil.",
+    "DefaultRootFolderForAutoImport": "Adresář pro automatický import",
+    "DefaultRootFolderForAutoImportHelpText": "Tento adresář se použije při automatickém importu",
+    "SetRootFolderForAutoImport": "Nastaví tento adresář jako výchozí adresář při automatickém importu",
+    "DefaultProfileForAutoImport": "Profil kvality pro automatický import",
+    "AutoImport": "AutoImport",
     "DelayProfile": "Zpožděný profil",
     "DelayProfiles": "Profily zpoždění",
     "Delete": "Smazat",
@@ -772,6 +777,7 @@
     "Retention": "Zadržení",
     "RootFolderCheckSingleMessage": "Chybí kořenová složka: {rootFolderPath}",
     "RootFolders": "Kořenové složky",
+    "NoRootFolders": "Žádné kořenové složky",
     "Rss": "RSS",
     "RssSync": "RSS synchronizace",
     "RssSyncInterval": "Interval synchronizace RSS",
@@ -1522,5 +1528,6 @@
     "InstallMajorVersionUpdateMessageLink": "Pro více informací prosím navštivte [{domain}]({url}).",
     "InstanceNameHelpText": "Jméno instance v záložce a v syslogu",
     "SetIndexerFlags": "Nastavit příznaky indexeru",
-    "ReleaseProfileIndexerHelpText": "Výběr, jakých indexerů se profil týká"
+    "ReleaseProfileIndexerHelpText": "Výběr, jakých indexerů se profil týká",
+    "DisableAutomaticImport": "Vypnout automatický import"
 }

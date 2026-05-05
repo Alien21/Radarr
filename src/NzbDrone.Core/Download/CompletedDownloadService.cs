@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,14 +5,18 @@ using NLog;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Qualities;
+using NzbDrone.Core.Tags;
 
 namespace NzbDrone.Core.Download
 {
@@ -35,6 +38,11 @@ namespace NzbDrone.Core.Download
         private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
         private readonly IRejectedImportService _rejectedImportService;
         private readonly Logger _logger;
+        private readonly ISearchForNewMovie _searchProxy;
+        private readonly IAddMovieService _addMovieService;
+        private readonly IQualityProfileRepository _qualityProfileRepository;
+        private readonly ITagService _tagService;
+        private readonly IConfigService _configService;
 
         public CompletedDownloadService(IEventAggregator eventAggregator,
                                         IHistoryService historyService,
@@ -44,6 +52,11 @@ namespace NzbDrone.Core.Download
                                         IMovieService movieService,
                                         ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
                                         IRejectedImportService rejectedImportService,
+                                        ISearchForNewMovie searchProxy,
+                                        IAddMovieService addMovieService,
+                                        IQualityProfileRepository qualityProfileRepository,
+                                        ITagService tagService,
+                                        IConfigService configService,
                                         Logger logger)
         {
             _eventAggregator = eventAggregator;
@@ -54,6 +67,11 @@ namespace NzbDrone.Core.Download
             _movieService = movieService;
             _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
             _rejectedImportService = rejectedImportService;
+            _searchProxy = searchProxy;
+            _addMovieService = addMovieService;
+            _qualityProfileRepository = qualityProfileRepository;
+            _tagService = tagService;
+            _configService = configService;
             _logger = logger;
         }
 
@@ -78,6 +96,7 @@ namespace NzbDrone.Core.Download
             if (historyItem == null && trackedDownload.DownloadItem.Category.IsNullOrWhiteSpace())
             {
                 trackedDownload.Warn("Download wasn't grabbed by Radarr and not in a category, Skipping.");
+                _logger.Warn("Download wasn't grabbed by Radarr and not in a category, Skipping.");
                 return;
             }
 
@@ -88,33 +107,140 @@ namespace NzbDrone.Core.Download
 
             var movie = _parsingService.GetMovie(trackedDownload.DownloadItem.Title);
 
+            if (movie != null)
+            {
+                AttachExistingMovie(trackedDownload, movie);
+            }
+
+            if (movie == null && historyItem != null)
+            {
+                movie = _movieService.GetMovie(historyItem.MovieId);
+                if (movie != null)
+                {
+                    AttachExistingMovie(trackedDownload, movie);
+                }
+            }
+
+            if (trackedDownload.RemoteMovie == null)
+            {
+                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+                if (parsed != null)
+                {
+                    trackedDownload.RemoteMovie = _parsingService.Map(parsed, "", 0);
+                }
+            }
+
+            if (trackedDownload.RemoteMovie == null)
+            {
+                trackedDownload.Warn($"Auto-import blocked: unable to resolve {trackedDownload.ImportItem?.Title} download to a movie.");
+                _logger.Error($"Auto-import blocked: unable to resolve {trackedDownload.ImportItem?.Title} download to a movie.");
+                SetStateToImportBlocked(trackedDownload);
+                return;
+            }
+
             if (movie == null)
             {
-                if (historyItem != null)
+                if (string.IsNullOrWhiteSpace(_configService.DefaultRootFolderForAutoImport))
                 {
-                    movie = _movieService.GetMovie(historyItem.MovieId);
+                    trackedDownload.Warn("Auto-import blocked: no default root folder configured for auto-import.");
+                    _logger.Warn("Auto-import blocked: no default root folder configured for auto-import.");
+                    SetStateToImportBlocked(trackedDownload);
+                    return;
+                }
+
+                QualityProfile profile;
+                profile = _configService.DefaultProfileForAutoImport == -1 ? _qualityProfileRepository.All().FirstOrDefault() : _qualityProfileRepository.Get(_configService.DefaultProfileForAutoImport);
+
+                if (profile == null)
+                {
+                    trackedDownload.Warn("Auto-import blocked: default quality profile not found (id: {0}).", _configService.DefaultProfileForAutoImport);
+                    _logger.Warn("Auto-import blocked: default quality profile not found (id: {0}).", _configService.DefaultProfileForAutoImport);
+                    SetStateToImportBlocked(trackedDownload);
+                    return;
+                }
+
+                var movies = _searchProxy.SearchForNewMovie(Path.GetFileName(trackedDownload.DownloadItem.Title));
+                if (movies == null || movies.Count <= 0)
+                {
+                    trackedDownload.Warn("Auto-import blocked: no movie match found for '{0}'.", trackedDownload.DownloadItem.Title);
+                    _logger.Warn("Auto-import blocked: no movie match found for '{0}'.", trackedDownload.DownloadItem.Title);
+                    SetStateToImportBlocked(trackedDownload);
+                    return;
+                }
+
+                var parsedYear = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Year;
+
+                if (parsedYear > 1890 && movies.Count(m => m.Year == parsedYear) == 1)
+                {
+                    movie = movies.First(m => m.Year == parsedYear);
                 }
 
                 if (movie == null)
                 {
-                    trackedDownload.Warn("Movie title mismatch, automatic import is not possible. Manual Import required.");
+                    trackedDownload.Warn("Auto-import blocked: no unique match for '{0}' (parsed year: {1}).", trackedDownload.DownloadItem.Title, parsedYear);
+                    _logger.Warn("Auto-import blocked: no unique match for '{0}' (parsed year: {1}).", trackedDownload.DownloadItem.Title, parsedYear);
                     SetStateToImportBlocked(trackedDownload);
-
                     return;
                 }
 
-                Enum.TryParse(historyItem.Data.GetValueOrDefault(MovieHistory.MOVIE_MATCH_TYPE, MovieMatchType.Unknown.ToString()), out MovieMatchType movieMatchType);
-                Enum.TryParse(historyItem.Data.GetValueOrDefault(MovieHistory.RELEASE_SOURCE, ReleaseSourceType.Unknown.ToString()), out ReleaseSourceType releaseSource);
-
-                // Show a warning if the release was matched by ID and the source is not interactive search
-                if (movieMatchType == MovieMatchType.Id && releaseSource != ReleaseSourceType.InteractiveSearch)
+                var existingMovie = _movieService.FindByTmdbId(movie.TmdbId);
+                if (existingMovie != null)
                 {
-                    trackedDownload.Warn("Found matching movie via grab history, but release was matched to movie by ID. Manual Import required.");
-                    SetStateToImportBlocked(trackedDownload);
+                    _logger.Debug($"Joining movie '{movie.Title}' tmdbid: {movie.TmdbId} to existing movie '{existingMovie.Path}'");
 
+                    AttachExistingMovie(trackedDownload, existingMovie);
                     return;
                 }
+
+                _logger.Debug($"Autocreate movie '{movie.Title}' tmdbid: {movie.TmdbId}");
+
+                var tag = _tagService.All().Where(t => t.Label.EqualsIgnoreCase("autocreated")).ToList().FirstOrDefault();
+                if (tag == null)
+                {
+                    tag = new Tag()
+                    {
+                        Label = "autocreated"
+                    };
+                    tag = _tagService.Add(tag);
+                }
+
+                movie.Monitored = true;
+                movie.Tags.Add(tag.Id);
+                movie.QualityProfile = profile;
+                movie.QualityProfileId = profile.Id;
+                movie.MinimumAvailability = MovieStatusType.Announced;
+                movie.RootFolderPath = _configService.DefaultRootFolderForAutoImport;
+                movie.AddOptions = new AddMovieOptions
+                {
+                    AddMethod = AddMovieMethod.Manual,
+                    Monitor = MonitorTypes.None,
+                    SearchForMovie = false
+                };
+
+                var newMovie = _addMovieService.AddMovie(movie);
+
+                trackedDownload.RemoteMovie.Movie = newMovie;
+
+                if (newMovie != null)
+                {
+                    trackedDownload.RemoteMovie.Movie.QualityProfile = profile;
+                    trackedDownload.RemoteMovie.Movie.QualityProfileId = profile.Id;
+
+                    trackedDownload.ClearStatus();
+                }
+                else
+                {
+                    trackedDownload.Warn($"Auto-import blocked: failed to add movie '{movie.Title}' (tmdbid: {movie.TmdbId}).");
+                    _logger.Error($"Auto-import blocked: failed to add movie '{movie.Title}' tmdbid: {movie.TmdbId}.");
+                    SetStateToImportBlocked(trackedDownload);
+                    return;
+                }
+
+                // trackedDownload.State = TrackedDownloadState.ImportPending;
+                // return;
             }
+
+            _logger.Debug($"Set State='{TrackedDownloadState.ImportPending}' for movie '{movie.Title}' tmdbid: {movie.TmdbId}");
 
             trackedDownload.State = TrackedDownloadState.ImportPending;
         }
@@ -266,6 +392,31 @@ namespace NzbDrone.Core.Download
         private void SetImportItem(TrackedDownload trackedDownload)
         {
             trackedDownload.ImportItem = _provideImportItemService.ProvideImportItem(trackedDownload.DownloadItem, trackedDownload.ImportItem);
+        }
+
+        private void AttachExistingMovie(TrackedDownload trackedDownload, Movie movie)
+        {
+            EnsureRemoteMovie(trackedDownload, movie);
+
+            trackedDownload.ClearStatus();
+
+            trackedDownload.State = TrackedDownloadState.ImportPending;
+        }
+
+        private void EnsureRemoteMovie(TrackedDownload trackedDownload, Movie movie)
+        {
+            if (trackedDownload.RemoteMovie == null)
+            {
+                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+                trackedDownload.RemoteMovie = parsed != null
+                    ? _parsingService.Map(parsed, movie.Id)
+                    : new RemoteMovie { Movie = movie };
+            }
+
+            if (trackedDownload.RemoteMovie.Movie == null)
+            {
+                trackedDownload.RemoteMovie.Movie = movie;
+            }
         }
 
         private bool ValidatePath(TrackedDownload trackedDownload)

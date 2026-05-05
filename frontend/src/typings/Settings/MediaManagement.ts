@@ -18,4 +18,6 @@ export default interface MediaManagement {
   importExtraFiles: boolean;
   extraFileExtensions: string;
   enableMediaInfo: boolean;
+  defaultRootFolderForAutoImport: string;
+  defaultProfileForAutoImport: number;
 }

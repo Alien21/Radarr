@@ -36,6 +36,12 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             StatusMessages = statusMessages;
         }
 
+        public void ClearStatus()
+        {
+            Status = TrackedDownloadStatus.Ok;
+            StatusMessages = Array.Empty<TrackedDownloadStatusMessage>();
+        }
+
         public void Fail()
         {
             Status = TrackedDownloadStatus.Error;

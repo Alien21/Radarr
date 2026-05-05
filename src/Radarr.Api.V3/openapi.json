@@ -10616,6 +10616,14 @@
           },
           "enableMediaInfo": {
             "type": "boolean"
+          },
+          "defaultRootFolderForAutoImport": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultProfileForAutoImport": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

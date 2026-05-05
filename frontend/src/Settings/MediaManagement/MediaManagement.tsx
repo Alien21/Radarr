@@ -22,13 +22,16 @@ import {
   saveNamingSettings,
   setMediaManagementSettingsValue,
 } from 'Store/Actions/settingsActions';
+import createRootFoldersSelector from 'Store/Selectors/createRootFoldersSelector';
 import createSettingsSectionSelector from 'Store/Selectors/createSettingsSectionSelector';
 import useIsWindows from 'System/useIsWindows';
 import { InputChanged } from 'typings/inputs';
+import formatBytes from 'Utilities/Number/formatBytes';
 import isEmpty from 'Utilities/Object/isEmpty';
 import translate from 'Utilities/String/translate';
 import Naming from './Naming/Naming';
 import AddRootFolder from './RootFolder/AddRootFolder';
+import styles from './MediaManagement.css';
 
 const SECTION = 'mediaManagement';
 
@@ -114,6 +117,43 @@ function MediaManagement() {
     validationWarnings,
   } = useSelector(createSettingsSectionSelector(SECTION));
 
+  const { items: rootFolderItems } = useSelector(createRootFoldersSelector());
+
+  const maxPathLength = rootFolderItems.reduce((maxValue, rootFolder) => {
+    return Math.max(maxValue, (rootFolder.path ?? '').length);
+  }, 0);
+
+  const defaultRootFolderForAutoImportOptions: EnhancedSelectInputValue<string>[] =
+    [
+      {
+        key: '',
+        get value() {
+          return translate('DisableAutomaticImport');
+        },
+      },
+      ...rootFolderItems.map((rootFolder) => {
+        return {
+          key: rootFolder.path,
+          get value() {
+            const freeSpaceValue =
+              typeof rootFolder.freeSpace === 'number'
+                ? rootFolder.freeSpace
+                : 0;
+            const freeSpaceText =
+              !rootFolder.accessible || rootFolder.freeSpace === undefined
+                ? '-'
+                : formatBytes(freeSpaceValue);
+
+            const paddedPath = (rootFolder.path ?? '').padEnd(
+              maxPathLength,
+              '\u00A0'
+            ); // NBSP
+            return `${paddedPath}\u00A0\u00A0(${freeSpaceText})`;
+          },
+        };
+      }),
+    ];
+
   const handleSavePress = useCallback(() => {
     dispatch(saveMediaManagementSettings());
     dispatch(saveNamingSettings());
@@ -127,6 +167,39 @@ function MediaManagement() {
     [dispatch]
   );
 
+  const handleSetRootFolderForAutoImportPress = useCallback(
+    (rootFolderPath: string) => {
+      dispatch(
+        // @ts-expect-error - actions are not typed
+        setMediaManagementSettingsValue({
+          name: 'defaultRootFolderForAutoImport',
+          value: rootFolderPath,
+        })
+      );
+    },
+    [dispatch]
+  );
+
+  const handleDefaultProfileForAutoImportChange = useCallback(
+    ({ value }: { value: string | number }) => {
+      const parsedProfileId =
+        typeof value === 'string' ? parseInt(value) : value;
+
+      if (!Number.isFinite(parsedProfileId)) {
+        return;
+      }
+
+      dispatch(
+        // @ts-expect-error - actions are not typed
+        setMediaManagementSettingsValue({
+          name: 'defaultProfileForAutoImport',
+          value: parsedProfileId,
+        })
+      );
+    },
+    [dispatch]
+  );
+
   useEffect(() => {
     dispatch(fetchMediaManagementSettings());
 
@@ -134,6 +207,8 @@ function MediaManagement() {
       dispatch(clearPendingChanges({ section: `settings.${SECTION}` }));
     };
   }, [dispatch]);
+
+  const hasRootFolders = rootFolderItems.length > 0;
 
   return (
     <PageContent title={translate('MediaManagementSettings')}>
@@ -519,7 +594,47 @@ function MediaManagement() {
         ) : null}
 
         <FieldSet legend={translate('RootFolders')}>
-          <RootFolders />
+          {hasSettings ? (
+            <FormGroup size={sizes.MEDIUM}>
+              <FormLabel>
+                {translate('DefaultRootFolderForAutoImport')}
+              </FormLabel>
+
+              {hasRootFolders ? (
+                <FormInputGroup
+                  className={styles.defaultRootFolderForAutoImportSelect}
+                  type={inputTypes.SELECT}
+                  name="defaultRootFolderForAutoImport"
+                  values={defaultRootFolderForAutoImportOptions}
+                  onChange={handleInputChange}
+                  {...settings.defaultRootFolderForAutoImport}
+                />
+              ) : (
+                <div style={{ paddingTop: 6 }}>
+                  {translate('NoRootFolders')}
+                </div>
+              )}
+            </FormGroup>
+          ) : null}
+
+          {hasSettings ? (
+            <FormGroup size={sizes.MEDIUM}>
+              <FormLabel>{translate('QualityProfile')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.QUALITY_PROFILE_SELECT}
+                name="defaultProfileForAutoImport"
+                onChange={handleDefaultProfileForAutoImportChange}
+                {...settings.defaultProfileForAutoImport}
+              />
+            </FormGroup>
+          ) : null}
+
+          <RootFolders
+            onSetRootFolderForAutoImportPress={
+              handleSetRootFolderForAutoImportPress
+            }
+          />
           <AddRootFolder />
         </FieldSet>
       </PageContentBody>
