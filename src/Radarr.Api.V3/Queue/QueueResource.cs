@@ -17,6 +17,7 @@ namespace Radarr.Api.V3.Queue
         public int? MovieId { get; set; }
         public MovieResource Movie { get; set; }
         public List<Language> Languages { get; set; }
+        public List<Language> SubtitleLanguages { get; set; }
         public QualityModel Quality { get; set; }
         public List<CustomFormatResource> CustomFormats { get; set; }
         public int CustomFormatScore { get; set; }
@@ -66,6 +67,7 @@ namespace Radarr.Api.V3.Queue
                 MovieId = model.Movie?.Id,
                 Movie = includeMovie && model.Movie != null ? model.Movie.ToResource(0) : null,
                 Languages = model.Languages,
+                SubtitleLanguages = model.SubtitleLanguages,
                 Quality = model.Quality,
                 CustomFormats = customFormats?.ToResource(false),
                 CustomFormatScore = customFormatScore,

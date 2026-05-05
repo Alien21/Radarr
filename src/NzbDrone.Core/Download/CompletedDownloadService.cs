@@ -517,16 +517,17 @@ namespace NzbDrone.Core.Download
                     return;
                 }
 
-                ApplyCompletedDownloadFileAnalysis(trackedDownload, localMovie);
-
                 var externalSubtitles = GetExternalSubtitleFiles(localMovie);
+                ApplyCompletedDownloadFileAnalysis(trackedDownload, localMovie, externalSubtitles);
+
                 var mediaInfo = localMovie.MediaInfo;
 
-                _logger.Debug("Completed download file analysis updated queue item '{0}' from file '{1}'. Quality: '{2}', queue languages: '{3}', media title: '{4}', embedded audio: '{5}', embedded subtitles: '{6}', external subtitles: '{7}'",
+                _logger.Debug("Completed download file analysis updated queue item '{0}' from file '{1}'. Quality: '{2}', queue languages: '{3}', queue subtitles: '{4}', media title: '{5}', embedded audio: '{6}', embedded subtitles: '{7}', external subtitles: '{8}'",
                     trackedDownload.DownloadItem.Title,
                     localMovie.Path,
                     localMovie.Quality,
                     FormatValues(localMovie.Languages),
+                    FormatValues(trackedDownload.AnalyzedSubtitleLanguages),
                     mediaInfo?.Title ?? "none",
                     FormatValues(mediaInfo?.AudioLanguages),
                     FormatValues(mediaInfo?.Subtitles),
@@ -538,7 +539,7 @@ namespace NzbDrone.Core.Download
             }
         }
 
-        private void ApplyCompletedDownloadFileAnalysis(TrackedDownload trackedDownload, LocalMovie localMovie)
+        private void ApplyCompletedDownloadFileAnalysis(TrackedDownload trackedDownload, LocalMovie localMovie, List<ExternalSubtitleFile> externalSubtitles)
         {
             if (localMovie.Quality?.Quality != Quality.Unknown)
             {
@@ -548,6 +549,12 @@ namespace NzbDrone.Core.Download
             if (localMovie.Languages?.Any(l => l != Language.Unknown) == true)
             {
                 trackedDownload.AnalyzedLanguages = localMovie.Languages;
+            }
+
+            var subtitleLanguages = GetSubtitleLanguages(localMovie, externalSubtitles);
+            if (subtitleLanguages.Any())
+            {
+                trackedDownload.AnalyzedSubtitleLanguages = subtitleLanguages;
             }
 
             if (trackedDownload.RemoteMovie != null)
@@ -670,6 +677,35 @@ namespace NzbDrone.Core.Download
                 .OrderByDescending(decision => decision.LocalMovie.Size)
                 .FirstOrDefault()
                 ?.LocalMovie;
+        }
+
+        private List<Language> GetSubtitleLanguages(LocalMovie localMovie, List<ExternalSubtitleFile> externalSubtitles)
+        {
+            var languages = new List<Language>();
+
+            var embeddedSubtitleLanguages = localMovie.MediaInfo?.Subtitles?
+                                                      .Where(language => language.IsNotNullOrWhiteSpace())
+                                                      .Distinct()
+                                                      .ToList() ?? new List<string>();
+
+            foreach (var subtitleLanguage in embeddedSubtitleLanguages)
+            {
+                languages.AddIfNotNull(IsoLanguages.Find(subtitleLanguage)?.Language);
+            }
+
+            if (externalSubtitles != null)
+            {
+                foreach (var subtitleFile in externalSubtitles)
+                {
+                    languages.AddIfNotNull(subtitleFile.Info?.Language);
+                }
+            }
+
+            return languages
+                .Where(language => language != Language.Unknown)
+                .GroupBy(language => language.Id)
+                .Select(group => group.First())
+                .ToList();
         }
 
         private List<ExternalSubtitleFile> GetExternalSubtitleFiles(LocalMovie localMovie)

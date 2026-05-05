@@ -71,6 +71,7 @@ namespace NzbDrone.Core.Queue
             var queue = new Queue
             {
                 Languages = languages ?? new List<Language> { Language.Unknown },
+                SubtitleLanguages = trackedDownload.AnalyzedSubtitleLanguages ?? new List<Language>(),
                 Quality = quality ?? new QualityModel(Quality.Unknown),
                 Title = trackedDownload.DownloadItem.Title,
                 Size = trackedDownload.DownloadItem.TotalSize,

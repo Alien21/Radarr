@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         public string AnalyzedMediaInfoPath { get; set; }
         public QualityModel AnalyzedQuality { get; set; }
         public List<Language> AnalyzedLanguages { get; set; }
+        public List<Language> AnalyzedSubtitleLanguages { get; set; }
 
         public TrackedDownload()
         {
