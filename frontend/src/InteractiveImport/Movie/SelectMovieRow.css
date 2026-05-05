@@ -23,3 +23,24 @@
 
   flex: 0 0 110px;
 }
+
+.externalLink {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+
+  & span {
+    cursor: pointer;
+    transition:
+      border-color 150ms ease-in-out,
+      background-color 150ms ease-in-out,
+      color 150ms ease-in-out;
+  }
+
+  &:hover span,
+  &:focus span {
+    border-color: var(--primaryColor);
+    background-color: var(--primaryColor);
+    color: var(--white);
+  }
+}

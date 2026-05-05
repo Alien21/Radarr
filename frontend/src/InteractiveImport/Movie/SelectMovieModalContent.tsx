@@ -167,16 +167,20 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
     [allMovies]
   );
 
-  const items = useMemo(
-    () =>
-      sortedMovies.filter(
-        (item) =>
-          item.title.toLowerCase().includes(filter.toLowerCase()) ||
-          item.tmdbId.toString().includes(filter) ||
-          item.imdbId?.includes(filter)
-      ),
-    [sortedMovies, filter]
-  );
+  const items = useMemo(() => {
+    const filterValue = filter.toLowerCase();
+
+    return sortedMovies.filter(
+      (item) =>
+        item.title.toLowerCase().includes(filterValue) ||
+        item.originalTitle?.toLowerCase().includes(filterValue) ||
+        item.alternateTitles?.some((title) =>
+          title.title.toLowerCase().includes(filterValue)
+        ) ||
+        item.tmdbId.toString().includes(filter) ||
+        item.imdbId?.includes(filter)
+    );
+  }, [sortedMovies, filter]);
 
   return (
     <ModalContent onModalClose={onModalClose}>

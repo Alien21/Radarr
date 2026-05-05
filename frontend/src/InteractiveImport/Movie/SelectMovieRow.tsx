@@ -10,6 +10,10 @@ interface SelectMovieRowProps {
   year: number;
 }
 
+function stopPropagation(event: React.MouseEvent<HTMLAnchorElement>) {
+  event.stopPropagation();
+}
+
 function SelectMovieRow({ title, year, tmdbId, imdbId }: SelectMovieRowProps) {
   return (
     <>
@@ -20,11 +24,29 @@ function SelectMovieRow({ title, year, tmdbId, imdbId }: SelectMovieRowProps) {
       <VirtualTableRowCell className={styles.year}>{year}</VirtualTableRowCell>
 
       <VirtualTableRowCell className={styles.imdbId}>
-        {imdbId ? <Label>{imdbId}</Label> : null}
+        {imdbId ? (
+          <a
+            className={styles.externalLink}
+            href={`https://www.imdb.com/title/${imdbId}/`}
+            rel="noreferrer"
+            target="_blank"
+            onClick={stopPropagation}
+          >
+            <Label>{imdbId}</Label>
+          </a>
+        ) : null}
       </VirtualTableRowCell>
 
       <VirtualTableRowCell className={styles.tmdbId}>
-        <Label>{tmdbId}</Label>
+        <a
+          className={styles.externalLink}
+          href={`https://www.themoviedb.org/movie/${tmdbId}`}
+          rel="noreferrer"
+          target="_blank"
+          onClick={stopPropagation}
+        >
+          <Label>{tmdbId}</Label>
+        </a>
       </VirtualTableRowCell>
     </>
   );
