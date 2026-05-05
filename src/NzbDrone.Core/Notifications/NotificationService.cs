@@ -259,7 +259,7 @@ namespace NzbDrone.Core.Notifications
 
             if (movie != null)
             {
-                mess = GetMessage(movie, message.RemoteMovie.ParsedMovieInfo.Quality);
+                mess = GetMessage(movie, message.RemoteMovie?.ParsedMovieInfo?.Quality ?? new QualityModel(Quality.Unknown));
             }
 
             if (mess.IsNullOrWhiteSpace() && message.TrackedDownload.DownloadItem != null)
@@ -276,7 +276,7 @@ namespace NzbDrone.Core.Notifications
             {
                 Message = mess,
                 Movie = movie,
-                Quality = message.RemoteMovie?.ParsedMovieInfo.Quality,
+                Quality = message.RemoteMovie?.ParsedMovieInfo?.Quality ?? new QualityModel(Quality.Unknown),
                 RemoteMovie = message.RemoteMovie,
                 TrackedDownload = message.TrackedDownload,
                 DownloadClientInfo = message.TrackedDownload.DownloadItem?.DownloadClientInfo,

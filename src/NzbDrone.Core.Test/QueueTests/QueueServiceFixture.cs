@@ -8,6 +8,7 @@ using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Queue;
 using NzbDrone.Core.Test.Framework;
 
@@ -59,6 +60,20 @@ namespace NzbDrone.Core.Test.QueueTests
             var distinct = queue.Select(v => v.Id).Distinct().ToArray();
 
             distinct.Should().HaveCount(1);
+        }
+
+        [Test]
+        public void should_map_queue_item_with_movie_but_no_parsed_movie_info()
+        {
+            _trackedDownloads.First().RemoteMovie.ParsedMovieInfo = null;
+
+            Subject.Handle(new TrackedDownloadRefreshedEvent(_trackedDownloads));
+
+            var queue = Subject.GetQueue();
+
+            queue.Should().HaveCount(1);
+            queue.First().Movie.Should().NotBeNull();
+            queue.First().Quality.Quality.Should().Be(Quality.Unknown);
         }
     }
 }
