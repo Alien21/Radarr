@@ -11,6 +11,14 @@ import selectUniqueIds from 'Utilities/Object/selectUniqueIds';
 import parseUrl from 'Utilities/String/parseUrl';
 import AddNewMovie from './AddNewMovie';
 
+function normalizeLookupTerm(term) {
+  return term.replace(/_/g, ' ')
+    .replace(/\b(mr|mrs|ms|dr|prof|st|jr|sr)\.(?=\S)/gi, '$1. ')
+    .replace(/\.(?=\S)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function createMapStateToProps() {
   return createSelector(
     (state) => state.addMovie,
@@ -90,7 +98,7 @@ class AddNewMovieConnector extends Component {
       this.props.clearAddMovie();
     } else {
       this._movieLookupTimeout = setTimeout(() => {
-        this.props.lookupMovie({ term });
+        this.props.lookupMovie({ term: normalizeLookupTerm(term) });
       }, 300);
     }
   };
