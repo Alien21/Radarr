@@ -19,6 +19,7 @@ import Scroller from 'Components/Scroller/Scroller';
 import Column from 'Components/Table/Column';
 import VirtualTableRowButton from 'Components/Table/VirtualTableRowButton';
 import { scrollDirections } from 'Helpers/Props';
+import Language from 'Language/Language';
 import Movie from 'Movie/Movie';
 import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
 import createLanguagesSelector from 'Store/Selectors/createLanguagesSelector';
@@ -93,17 +94,14 @@ interface SelectMovieModalContentProps {
 interface RowItemData {
   items: Movie[];
   columns: Column[];
-  selectedMovieInfoLanguage: number;
-  languages: { id: number; name: string }[];
+  languages: Language[];
+  selectedLanguage?: Language;
   onMovieSelect(movieId: number): void;
 }
 
 function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
-  const { items, languages, selectedMovieInfoLanguage, onMovieSelect } = data;
+  const { items, languages, selectedLanguage, onMovieSelect } = data;
   const movie = index >= items.length ? null : items[index];
-  const selectedLanguage = languages.find(
-    (language) => language.id === selectedMovieInfoLanguage
-  );
 
   const handlePress = useCallback(() => {
     if (movie?.id) {
@@ -131,6 +129,7 @@ function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
         imdbId={movie.imdbId}
         year={movie.year}
         movieFile={movie.movieFile}
+        languages={languages}
         selectedLanguage={selectedLanguage}
       />
     </VirtualTableRowButton>
@@ -145,6 +144,9 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
   const { movieInfoLanguage } = useSelector(createUISettingsSelector());
   const { items: languages } = useSelector(createLanguagesSelector());
+  const selectedLanguage = languages.find(
+    (language) => language.id === movieInfoLanguage
+  );
   const [filter, setFilter] = useState('');
   const [size, setSize] = useState({ width: 0, height: 0 });
   const windowHeight = window.innerHeight;
@@ -272,8 +274,8 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
               items,
               columns,
               onMovieSelect: onMovieSelectWrapper,
-              selectedMovieInfoLanguage: movieInfoLanguage,
               languages,
+              selectedLanguage,
             }}
           >
             {Row}
