@@ -1,3 +1,4 @@
+import classNames from 'classnames';
 import React, {
   useCallback,
   useEffect,
@@ -103,11 +104,41 @@ import styles from './MovieDetails.css';
 
 const defaultFontSize = parseInt(fonts.defaultFontSize);
 const lineHeight = parseFloat(fonts.lineHeight);
-const englishLanguageId = 1;
 
 function getFanartUrl(images: Image[]) {
   const image = images.find((image) => image.coverType === 'fanart');
   return image?.url ?? image?.remoteUrl;
+}
+
+function getTitleKey(title: string | undefined) {
+  return title?.trim().toLowerCase();
+}
+
+function getSecondaryTitles(
+  title: string,
+  defaultTitle: string | undefined,
+  originalTitle: string | undefined
+) {
+  const seenTitles = new Set<string>();
+  const titleKey = getTitleKey(title);
+
+  if (titleKey) {
+    seenTitles.add(titleKey);
+  }
+
+  return [defaultTitle, originalTitle].filter(
+    (secondaryTitle): secondaryTitle is string => {
+      const secondaryTitleKey = getTitleKey(secondaryTitle);
+
+      if (!secondaryTitleKey || seenTitles.has(secondaryTitleKey)) {
+        return false;
+      }
+
+      seenTitles.add(secondaryTitleKey);
+
+      return true;
+    }
+  );
 }
 
 function createMovieFilesSelector() {
@@ -172,9 +203,7 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
   const { isMovieCreditsFetching, movieCreditsError } = useSelector(
     createMovieCreditsSelector()
   );
-  const { movieInfoLanguage, movieRuntimeFormat } = useSelector(
-    createUISettingsSelector()
-  );
+  const { movieRuntimeFormat } = useSelector(createUISettingsSelector());
   const isSidebarVisible = useSelector(
     (state: AppState) => state.app.isSidebarVisible
   );
@@ -525,6 +554,7 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
     tmdbId,
     imdbId,
     title,
+    defaultTitle,
     originalTitle,
     year,
     inCinemas,
@@ -561,10 +591,12 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
   const marqueeWidth = isSmallScreen ? titleWidth : titleWidth - 150;
 
   const titleWithYear = `${title}${year > 0 ? ` (${year})` : ''}`;
-  const showOriginalTitle =
-    movieInfoLanguage !== englishLanguageId &&
-    !!originalTitle &&
-    originalTitle !== title;
+  const secondaryTitles = getSecondaryTitles(
+    title,
+    defaultTitle,
+    originalTitle
+  );
+  const hasMultipleSecondaryTitles = secondaryTitles.length > 1;
 
   return (
     <PageContent title={titleWithYear}>
@@ -668,15 +700,28 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
                     className={styles.titleTextContainer}
                     style={{ width: marqueeWidth }}
                   >
-                    <div className={styles.title}>
-                      <Marquee text={title} title={originalTitle} />
+                    <div
+                      className={classNames(
+                        styles.title,
+                        hasMultipleSecondaryTitles &&
+                          styles.titleWithMultipleSecondaryTitles
+                      )}
+                    >
+                      <Marquee text={title} title={title} />
                     </div>
 
-                    {showOriginalTitle ? (
-                      <div className={styles.secondaryTitle}>
-                        <Marquee text={originalTitle} title={originalTitle} />
+                    {secondaryTitles.map((secondaryTitle) => (
+                      <div
+                        key={secondaryTitle}
+                        className={classNames(
+                          styles.secondaryTitle,
+                          hasMultipleSecondaryTitles &&
+                            styles.secondaryTitleWithMultipleSecondaryTitles
+                        )}
+                      >
+                        <Marquee text={secondaryTitle} title={secondaryTitle} />
                       </div>
-                    ) : null}
+                    ))}
                   </div>
                 </div>
 

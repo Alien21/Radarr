@@ -29,6 +29,7 @@ interface CssExports {
   'rating': string;
   'runtime': string;
   'secondaryTitle': string;
+  'secondaryTitleWithMultipleSecondaryTitles': string;
   'selectedTab': string;
   'sizeOnDisk': string;
   'statusName': string;
@@ -40,6 +41,7 @@ interface CssExports {
   'titleContainer': string;
   'titleRow': string;
   'titleTextContainer': string;
+  'titleWithMultipleSecondaryTitles': string;
   'toggleMonitoredContainer': string;
   'year': string;
 }
