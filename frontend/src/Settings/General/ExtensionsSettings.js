@@ -12,7 +12,8 @@ function ExtensionsSettings(props) {
 
   const {
     blockAutoImportForExistingMovieFiles,
-    analyzeCompletedDownloadFiles
+    analyzeCompletedDownloadFiles,
+    preferDualAudio
   } = settings;
 
   return (
@@ -38,6 +39,18 @@ function ExtensionsSettings(props) {
           helpText={translate('AnalyzeCompletedDownloadFilesHelpText')}
           onChange={onInputChange}
           {...analyzeCompletedDownloadFiles}
+        />
+      </FormGroup>
+
+      <FormGroup size={sizes.MEDIUM}>
+        <FormLabel>{translate('PreferDualAudio')}</FormLabel>
+
+        <FormInputGroup
+          type={inputTypes.CHECK}
+          name="preferDualAudio"
+          helpText={translate('PreferDualAudioHelpText')}
+          onChange={onInputChange}
+          {...preferDualAudio}
         />
       </FormGroup>
     </FieldSet>

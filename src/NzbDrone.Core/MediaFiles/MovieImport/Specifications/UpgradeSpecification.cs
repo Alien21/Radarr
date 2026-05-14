@@ -12,14 +12,17 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
     {
         private readonly IConfigService _configService;
         private readonly ICustomFormatCalculationService _formatService;
+        private readonly IDualAudioImportPreference _dualAudioImportPreference;
         private readonly Logger _logger;
 
         public UpgradeSpecification(IConfigService configService,
                                     ICustomFormatCalculationService formatService,
+                                    IDualAudioImportPreference dualAudioImportPreference,
                                     Logger logger)
         {
             _configService = configService;
             _formatService = formatService;
+            _dualAudioImportPreference = dualAudioImportPreference;
             _logger = logger;
         }
 
@@ -41,6 +44,13 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
                 }
 
                 var qualityCompare = qualityComparer.Compare(localMovie.Quality.Quality, movieFile.Quality.Quality);
+                var dualAudioPreference = _dualAudioImportPreference.Evaluate(localMovie, movieFile) ?? DualAudioImportPreferenceResult.None();
+
+                if (dualAudioPreference.RequiresManualReview)
+                {
+                    _logger.Debug("Preferred dual-audio upgrade requires manual review for movie. Existing quality: {0}. New Quality {1}. Skipping {2}", movieFile.Quality.Quality, localMovie.Quality.Quality, localMovie.Path);
+                    return ImportSpecDecision.Reject(ImportRejectionReason.DualAudioUpgradeManualReview, dualAudioPreference.ManualReviewReason);
+                }
 
                 if (qualityCompare < 0)
                 {
@@ -66,6 +76,17 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
 
                 if (qualityCompare == 0 && newFormatScore < currentFormatScore)
                 {
+                    if (dualAudioPreference.IsPreferredUpgrade)
+                    {
+                        _logger.Debug("New item's custom formats [{0}] ({1}) do not improve on [{2}] ({3}), but it is a preferred dual-audio upgrade, accepting",
+                            newCustomFormats != null ? newCustomFormats.ConcatToString() : "",
+                            newFormatScore,
+                            currentCustomFormats != null ? currentCustomFormats.ConcatToString() : "",
+                            currentFormatScore);
+
+                        return ImportSpecDecision.Accept();
+                    }
+
                     _logger.Debug("New item's custom formats [{0}] ({1}) do not improve on [{2}] ({3}), skipping",
                         newCustomFormats != null ? newCustomFormats.ConcatToString() : "",
                         newFormatScore,

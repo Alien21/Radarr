@@ -219,6 +219,61 @@ namespace NzbDrone.Core.Test.Download
             AssertNotImported();
         }
 
+        [Test]
+        public void should_bypass_existing_movie_auto_import_block_for_preferred_dual_audio_upgrade()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.BlockAutoImportForExistingMovieFiles)
+                .Returns(true);
+
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.PreferDualAudio)
+                .Returns(true);
+
+            var outputPath = @"C:\DropFolder\MyDownload.mkv".AsOsAgnostic();
+            _trackedDownload.DownloadItem.OutputPath = new OsPath(outputPath);
+
+            var movie = _trackedDownload.RemoteMovie.Movie;
+            movie.MovieFileId = 1;
+            movie.MovieFile = new MovieFile();
+
+            var localMovie = new LocalMovie
+            {
+                Path = outputPath,
+                Movie = movie
+            };
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.FileExists(outputPath))
+                .Returns(true);
+
+            Mocker.GetMock<IMakeImportDecision>()
+                .Setup(v => v.GetImportDecisions(It.IsAny<List<string>>(), movie, _trackedDownload.DownloadItem, null, true))
+                .Returns(new List<ImportDecision>
+                {
+                    new ImportDecision(localMovie)
+                });
+
+            Mocker.GetMock<IDualAudioImportPreference>()
+                .Setup(v => v.Evaluate(localMovie, movie.MovieFile))
+                .Returns(new DualAudioImportPreferenceResult
+                {
+                    Applies = true,
+                    IsPreferredUpgrade = true
+                });
+
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Setup(v => v.ProcessPath(outputPath, ImportMode.Auto, movie, _trackedDownload.DownloadItem))
+                .Returns(new List<ImportResult>
+                {
+                    new ImportResult(new ImportDecision(localMovie))
+                });
+
+            Subject.Import(_trackedDownload);
+
+            AssertImported();
+        }
+
         private void AssertNotImported()
         {
             Mocker.GetMock<IEventAggregator>()

@@ -12,6 +12,7 @@ using NzbDrone.Core.Extras.Subtitles;
 using NzbDrone.Core.History;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Messaging.Events;
@@ -42,6 +43,7 @@ namespace NzbDrone.Core.Download
         private readonly IDiskScanService _diskScanService;
         private readonly IMakeImportDecision _importDecisionMaker;
         private readonly IAggregationService _aggregationService;
+        private readonly IDualAudioImportPreference _dualAudioImportPreference;
         private readonly IParsingService _parsingService;
         private readonly IMovieService _movieService;
         private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
@@ -61,6 +63,7 @@ namespace NzbDrone.Core.Download
                                         IDiskScanService diskScanService,
                                         IMakeImportDecision importDecisionMaker,
                                         IAggregationService aggregationService,
+                                        IDualAudioImportPreference dualAudioImportPreference,
                                         IParsingService parsingService,
                                         IMovieService movieService,
                                         ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
@@ -80,6 +83,7 @@ namespace NzbDrone.Core.Download
             _diskScanService = diskScanService;
             _importDecisionMaker = importDecisionMaker;
             _aggregationService = aggregationService;
+            _dualAudioImportPreference = dualAudioImportPreference;
             _parsingService = parsingService;
             _movieService = movieService;
             _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
@@ -479,10 +483,165 @@ namespace NzbDrone.Core.Download
 
             AnalyzeCompletedDownloadFile(trackedDownload);
 
+            if (ShouldBypassExistingMovieAutoImportBlock(trackedDownload, movie))
+            {
+                return false;
+            }
+
             trackedDownload.Warn("Auto-import blocked: '{0}' already has a movie file in library (tmdbid: {1}).", movie.Title, movie.TmdbId);
             _logger.Warn("Auto-import blocked: '{0}' tmdbid: {1} already has a movie file in library.", movie.Title, movie.TmdbId);
             SetStateToImportBlocked(trackedDownload);
             return true;
+        }
+
+        private bool ShouldBypassExistingMovieAutoImportBlock(TrackedDownload trackedDownload, Movie movie)
+        {
+            if (trackedDownload.ImportItem == null ||
+                trackedDownload.ImportItem.OutputPath.FullPath.IsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            var decisions = GetCompletedDownloadImportDecisions(trackedDownload, movie, trackedDownload.ImportItem.OutputPath.FullPath);
+            var qualityUpgradeDecision = GetApprovedQualityUpgradeDecision(decisions, movie);
+
+            if (qualityUpgradeDecision != null)
+            {
+                _logger.Info("Auto-import block bypassed: '{0}' tmdbid: {1} has an approved quality upgrade '{2}' ({3} > {4}).",
+                    movie.Title,
+                    movie.TmdbId,
+                    qualityUpgradeDecision.LocalMovie.Path,
+                    qualityUpgradeDecision.LocalMovie.Quality,
+                    movie.MovieFile.Quality);
+
+                return true;
+            }
+
+            if (!_configService.PreferDualAudio)
+            {
+                return false;
+            }
+
+            var preferredDualAudioDecision = decisions.FirstOrDefault(decision =>
+            {
+                if (!decision.Approved)
+                {
+                    return false;
+                }
+
+                var dualAudioPreference = _dualAudioImportPreference.Evaluate(decision.LocalMovie, movie.MovieFile);
+                return dualAudioPreference?.IsPreferredUpgrade == true;
+            });
+
+            if (preferredDualAudioDecision == null)
+            {
+                return false;
+            }
+
+            _logger.Info("Auto-import block bypassed: '{0}' tmdbid: {1} has an approved preferred dual-audio upgrade '{2}'.", movie.Title, movie.TmdbId, preferredDualAudioDecision.LocalMovie.Path);
+            return true;
+        }
+
+        private ImportDecision GetApprovedQualityUpgradeDecision(List<ImportDecision> decisions, Movie movie)
+        {
+            if (movie.MovieFile?.Quality == null ||
+                movie.QualityProfile == null)
+            {
+                return null;
+            }
+
+            var qualityComparer = new QualityModelComparer(movie.QualityProfile);
+
+            return decisions.FirstOrDefault(decision =>
+                decision.Approved &&
+                decision.LocalMovie?.Quality != null &&
+                !ReplacesPreferredDualAudioWithNonDual(decision.LocalMovie, movie.MovieFile) &&
+                qualityComparer.Compare(decision.LocalMovie.Quality, movie.MovieFile.Quality) > 0);
+        }
+
+        private bool ReplacesPreferredDualAudioWithNonDual(LocalMovie localMovie, MovieFile existingMovieFile)
+        {
+            if (!_configService.PreferDualAudio)
+            {
+                return false;
+            }
+
+            var preferredLanguage = (Language)_configService.MovieInfoLanguage;
+
+            if (!IsKnownLanguage(preferredLanguage) ||
+                !HasPreferredDualAudio(existingMovieFile.MediaInfo, existingMovieFile.Languages, preferredLanguage))
+            {
+                return false;
+            }
+
+            return !HasPreferredDualAudio(localMovie.MediaInfo, localMovie.Languages, preferredLanguage);
+        }
+
+        private static bool HasPreferredDualAudio(MediaInfoModel mediaInfo, List<Language> parsedLanguages, Language preferredLanguage)
+        {
+            var audioLanguages = GetAudioLanguages(mediaInfo, parsedLanguages);
+
+            return audioLanguages.KnownLanguages.Contains(preferredLanguage) &&
+                   audioLanguages.DistinctAudioLanguages.Count > 1;
+        }
+
+        private static AudioLanguageSet GetAudioLanguages(MediaInfoModel mediaInfo, List<Language> parsedLanguages)
+        {
+            var languages = new AudioLanguageSet();
+
+            foreach (var audioLanguage in mediaInfo?.AudioLanguages ?? new List<string>())
+            {
+                AddRawLanguage(languages, audioLanguage);
+            }
+
+            foreach (var language in parsedLanguages ?? new List<Language>())
+            {
+                AddKnownLanguage(languages, language);
+            }
+
+            return languages;
+        }
+
+        private static void AddRawLanguage(AudioLanguageSet languages, string rawLanguage)
+        {
+            if (rawLanguage.IsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            var language = ParseLanguage(rawLanguage);
+
+            if (IsKnownLanguage(language))
+            {
+                AddKnownLanguage(languages, language);
+                return;
+            }
+
+            languages.DistinctAudioLanguages.Add(rawLanguage.Trim().ToLowerInvariant());
+        }
+
+        private static void AddKnownLanguage(AudioLanguageSet languages, Language language)
+        {
+            if (!IsKnownLanguage(language))
+            {
+                return;
+            }
+
+            languages.KnownLanguages.Add(language);
+            languages.DistinctAudioLanguages.Add($"language:{language.Id}");
+        }
+
+        private static Language ParseLanguage(string rawLanguage)
+        {
+            var trimmedLanguage = rawLanguage.Trim();
+
+            return IsoLanguages.Find(trimmedLanguage)?.Language ??
+                   IsoLanguages.FindByName(trimmedLanguage)?.Language;
+        }
+
+        private static bool IsKnownLanguage(Language language)
+        {
+            return language is { Id: > 0 };
         }
 
         private void AnalyzeCompletedDownloadFile(TrackedDownload trackedDownload)
@@ -860,6 +1019,12 @@ namespace NzbDrone.Core.Download
         {
             public string Path { get; set; }
             public SubtitleTitleInfo Info { get; set; }
+        }
+
+        private class AudioLanguageSet
+        {
+            public HashSet<Language> KnownLanguages { get; } = new HashSet<Language>();
+            public HashSet<string> DistinctAudioLanguages { get; } = new HashSet<string>();
         }
     }
 }

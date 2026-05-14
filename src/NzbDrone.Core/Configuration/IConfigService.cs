@@ -94,6 +94,7 @@ namespace NzbDrone.Core.Configuration
         // Extensions
         bool BlockAutoImportForExistingMovieFiles { get; }
         bool AnalyzeCompletedDownloadFiles { get; }
+        bool PreferDualAudio { get; }
 
         // Proxy
         bool ProxyEnabled { get; }

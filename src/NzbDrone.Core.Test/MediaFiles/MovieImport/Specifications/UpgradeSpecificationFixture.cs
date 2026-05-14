@@ -5,6 +5,7 @@ using NUnit.Framework;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.MediaFiles.MovieImport.Specifications;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
@@ -236,6 +237,77 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Specifications
             _localMovie.Movie.MovieFile = movieFile;
 
             Subject.IsSatisfiedBy(_localMovie, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_return_true_if_preferred_dual_audio_upgrade_has_lower_custom_format_score()
+        {
+            var movieFileCustomFormats = Builder<CustomFormat>.CreateListOfSize(1).Build().ToList();
+
+            var movieFile = new MovieFile
+            {
+                Quality = new QualityModel(Quality.Bluray1080p)
+            };
+
+            _movie.QualityProfile.FormatItems = movieFileCustomFormats.Select(c => new ProfileFormatItem
+            {
+                Format = c,
+                Score = 50
+            })
+                .ToList();
+
+            Mocker.GetMock<IConfigService>()
+                .Setup(s => s.DownloadPropersAndRepacks)
+                .Returns(ProperDownloadTypes.DoNotPrefer);
+
+            Mocker.GetMock<ICustomFormatCalculationService>()
+                .Setup(s => s.ParseCustomFormat(movieFile))
+                .Returns(movieFileCustomFormats);
+
+            Mocker.GetMock<IDualAudioImportPreference>()
+                .Setup(s => s.Evaluate(_localMovie, movieFile))
+                .Returns(new DualAudioImportPreferenceResult
+                {
+                    Applies = true,
+                    IsPreferredUpgrade = true
+                });
+
+            _localMovie.Quality = new QualityModel(Quality.Bluray1080p);
+            _localMovie.CustomFormats = Builder<CustomFormat>.CreateListOfSize(1).Build().ToList();
+            _localMovie.CustomFormatScore = 20;
+
+            _localMovie.Movie.MovieFileId = 1;
+            _localMovie.Movie.MovieFile = movieFile;
+
+            Subject.IsSatisfiedBy(_localMovie, null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_return_false_if_preferred_dual_audio_upgrade_requires_manual_review()
+        {
+            var movieFile = new MovieFile
+            {
+                Quality = new QualityModel(Quality.Bluray1080p)
+            };
+
+            Mocker.GetMock<IDualAudioImportPreference>()
+                .Setup(s => s.Evaluate(_localMovie, movieFile))
+                .Returns(new DualAudioImportPreferenceResult
+                {
+                    Applies = true,
+                    RequiresManualReview = true,
+                    ManualReviewReason = "Dual-audio candidate requires manual review."
+                });
+
+            _localMovie.Quality = new QualityModel(Quality.Bluray1080p);
+
+            _localMovie.Movie.MovieFileId = 1;
+            _localMovie.Movie.MovieFile = movieFile;
+
+            var result = Subject.IsSatisfiedBy(_localMovie, null);
+
+            result.Accepted.Should().BeFalse();
+            result.Reason.Should().Be(ImportRejectionReason.DualAudioUpgradeManualReview);
         }
     }
 }
