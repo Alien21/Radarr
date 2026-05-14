@@ -64,6 +64,7 @@ interface Movie extends ModelBase {
   monitored: boolean;
   status: MovieStatus;
   title: string;
+  defaultTitle?: string;
   titleSlug: string;
   originalTitle: string;
   originalLanguage: Language;

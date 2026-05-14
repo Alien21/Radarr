@@ -29,6 +29,7 @@ namespace Radarr.Api.V3.Movies
 
         // View Only
         public string Title { get; set; }
+        public string DefaultTitle { get; set; }
         public string OriginalTitle { get; set; }
         public Language OriginalLanguage { get; set; }
         public List<AlternativeTitleResource> AlternateTitles { get; set; }
@@ -118,6 +119,7 @@ namespace Radarr.Api.V3.Movies
                 Id = model.Id,
                 TmdbId = model.TmdbId,
                 Title = translatedTitle,
+                DefaultTitle = model.MovieMetadata.Value.Title,
                 OriginalTitle = model.MovieMetadata.Value.OriginalTitle,
                 OriginalLanguage = model.MovieMetadata.Value.OriginalLanguage,
                 SortTitle = MovieTitleNormalizer.Normalize(translatedTitle, model.TmdbId),

@@ -10927,6 +10927,10 @@
             "type": "string",
             "nullable": true
           },
+          "defaultTitle": {
+            "type": "string",
+            "nullable": true
+          },
           "originalTitle": {
             "type": "string",
             "nullable": true

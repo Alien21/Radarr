@@ -19,6 +19,7 @@ import Movie from 'Movie/Movie';
 import MovieFormats from 'Movie/MovieFormats';
 import MovieLanguages from 'Movie/MovieLanguages';
 import MovieQuality from 'Movie/MovieQuality';
+import useMovie from 'Movie/useMovie';
 import { QualityModel } from 'Quality/Quality';
 import {
   reprocessInteractiveImportItems,
@@ -89,6 +90,7 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
   } = props;
 
   const dispatch = useDispatch();
+  const movieFromStore = useMovie(movie?.id);
 
   const isMovieColumnVisible = useMemo(
     () => columns.find((c) => c.name === 'movie')?.isVisible ?? false,
@@ -258,7 +260,7 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
     [id, dispatch, setSelectModalOpen, selectRowAfterChange]
   );
 
-  const movieTitle = movie ? movie.title : '';
+  const movieTitle = movieFromStore?.title ?? movie?.title ?? '';
 
   const showMoviePlaceholder = isSelected && !movie;
   const showReleaseGroupPlaceholder = isSelected && !releaseGroup;
@@ -390,6 +392,7 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
       <SelectMovieModal
         isOpen={selectModalOpen === 'movie'}
         modalTitle={modalTitle}
+        selectedMovie={movie}
         onMovieSelect={onMovieSelect}
         onModalClose={onSelectModalClose}
       />

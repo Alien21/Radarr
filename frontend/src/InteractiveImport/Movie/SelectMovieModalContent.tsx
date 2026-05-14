@@ -85,8 +85,22 @@ function normalizeMovieFilterValue(value: string | undefined | null) {
     .trim();
 }
 
+function getMovieSearchValues(movie: Movie | undefined) {
+  if (!movie) {
+    return [];
+  }
+
+  return [
+    movie.title,
+    movie.defaultTitle,
+    movie.originalTitle,
+    ...(movie.alternateTitles ?? []).map(({ title }) => title),
+  ].filter((value): value is string => !!value);
+}
+
 interface SelectMovieModalContentProps {
   modalTitle: string;
+  selectedMovie?: Movie;
   onMovieSelect(movie: Movie): void;
   onModalClose(): void;
 }
@@ -137,7 +151,7 @@ function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
 }
 
 function SelectMovieModalContent(props: SelectMovieModalContentProps) {
-  const { modalTitle, onMovieSelect, onModalClose } = props;
+  const { modalTitle, selectedMovie, onMovieSelect, onModalClose } = props;
 
   const listRef = useRef<List<RowItemData>>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -218,21 +232,22 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
     }
 
     return sortedMovies.filter((item) => {
-      const movieTitles = [
-        item.title,
-        item.originalTitle,
-        ...(item.alternateTitles ?? []).map(({ title }) => title),
+      const movieSearchValues = [
+        ...getMovieSearchValues(item),
+        ...(selectedMovie?.id === item.id
+          ? getMovieSearchValues(selectedMovie)
+          : []),
       ];
 
       return (
-        movieTitles.some((title) =>
-          normalizeMovieFilterValue(title).includes(filterValue)
+        movieSearchValues.some((value) =>
+          normalizeMovieFilterValue(value).includes(filterValue)
         ) ||
         item.tmdbId.toString().includes(idFilterValue) ||
         item.imdbId?.toLowerCase().includes(idFilterValue)
       );
     });
-  }, [sortedMovies, filter]);
+  }, [sortedMovies, filter, selectedMovie]);
 
   return (
     <ModalContent onModalClose={onModalClose}>
