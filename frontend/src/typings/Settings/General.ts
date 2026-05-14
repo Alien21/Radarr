@@ -29,6 +29,7 @@ export default interface General {
   updateAutomatically: boolean;
   updateMechanism: UpdateMechanism;
   updateScriptPath: string;
+  parseTmdbIdFromReleaseName: boolean;
   blockAutoImportForExistingMovieFiles: boolean;
   proxyEnabled: boolean;
   proxyType: string;

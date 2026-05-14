@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Test.Framework;
@@ -30,6 +32,38 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
 
             Mocker.GetMock<IMovieService>()
                 .Verify(s => s.FindByTitle(Parser.Parser.ParseMovieTitle(title, false).MovieTitles, It.IsAny<int>(), It.IsAny<List<string>>(), null), Times.Once());
+        }
+
+        [Test]
+        public void should_match_tmdb_id_from_title_when_enabled()
+        {
+            const string title = "Wrong.Movie.[tmdb:12345].2020.720p.hdtv";
+            var movie = new Movie { TmdbId = 12345 };
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.ParseTmdbIdFromReleaseName)
+                  .Returns(true);
+
+            Mocker.GetMock<IMovieService>()
+                  .Setup(s => s.FindByTmdbId(movie.TmdbId))
+                  .Returns(movie);
+
+            Subject.GetMovie(title).Should().Be(movie);
+        }
+
+        [Test]
+        public void should_not_match_tmdb_id_from_title_when_disabled()
+        {
+            const string title = "Wrong.Movie.[tmdb:12345].2020.720p.hdtv";
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.ParseTmdbIdFromReleaseName)
+                  .Returns(false);
+
+            Subject.GetMovie(title);
+
+            Mocker.GetMock<IMovieService>()
+                  .Verify(s => s.FindByTmdbId(12345), Times.Never());
         }
 
         /*[Test]

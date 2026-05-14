@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
@@ -23,12 +23,15 @@ namespace NzbDrone.Core.Parser
         private static HashSet<ArabicRomanNumeral> _arabicRomanNumeralMappings;
 
         private readonly IMovieService _movieService;
+        private readonly IConfigService _configService;
         private readonly Logger _logger;
 
         public ParsingService(IMovieService movieService,
+                              IConfigService configService,
                               Logger logger)
         {
             _movieService = movieService;
+            _configService = configService;
             _logger = logger;
 
             if (_arabicRomanNumeralMappings == null)
@@ -39,32 +42,28 @@ namespace NzbDrone.Core.Parser
 
         public ParsedMovieInfo ParseMinimalPathMovieInfo(string path)
         {
-            var fileInfo = new FileInfo(path);
-
-            var result = Parser.ParseMovieTitle(fileInfo.Name, true);
-
-            if (result == null)
-            {
-                _logger.Debug("Attempting to parse movie info using directory and file names. '{0}'", fileInfo.Directory.Name);
-                result = Parser.ParseMovieTitle(fileInfo.Directory.Name + " " + fileInfo.Name);
-            }
-
-            if (result == null)
-            {
-                _logger.Debug("Attempting to parse movie info using directory name. '{0}'", fileInfo.Directory.Name);
-                result = Parser.ParseMovieTitle(fileInfo.Directory.Name + fileInfo.Extension);
-            }
-
-            return result;
+            return Parser.ParseMoviePath(path, _configService.ParseTmdbIdFromReleaseName);
         }
 
         public Movie GetMovie(string title)
         {
-            var parsedMovieInfo = Parser.ParseMovieTitle(title);
+            var parsedMovieInfo = Parser.ParseMovieTitle(title, false, _configService.ParseTmdbIdFromReleaseName);
 
             if (parsedMovieInfo == null)
             {
                 return _movieService.FindByTitle(title);
+            }
+
+            if (_configService.ParseTmdbIdFromReleaseName && parsedMovieInfo.TmdbId > 0)
+            {
+                var movie = _movieService.FindByTmdbId(parsedMovieInfo.TmdbId);
+
+                if (movie == null)
+                {
+                    _logger.Debug("No matching movie with TMDb ID {0}", parsedMovieInfo.TmdbId);
+                }
+
+                return movie;
             }
 
             var result = TryGetMovieByTitleAndOrYear(parsedMovieInfo);
@@ -128,6 +127,18 @@ namespace NzbDrone.Core.Parser
         {
             FindMovieResult result = null;
 
+            if (_configService.ParseTmdbIdFromReleaseName && parsedMovieInfo.TmdbId > 0)
+            {
+                result = TryGetMovieByExplicitTmdbId(parsedMovieInfo.TmdbId);
+
+                if (result == null)
+                {
+                    _logger.Debug("No matching movie with TMDb ID {0}", parsedMovieInfo.TmdbId);
+                }
+
+                return result;
+            }
+
             if (!string.IsNullOrWhiteSpace(imdbId) && imdbId != "0")
             {
                 result = TryGetMovieByImDbId(parsedMovieInfo, imdbId);
@@ -182,6 +193,13 @@ namespace NzbDrone.Core.Parser
             }
 
             return null;
+        }
+
+        private FindMovieResult TryGetMovieByExplicitTmdbId(int tmdbId)
+        {
+            var movie = _movieService.FindByTmdbId(tmdbId);
+
+            return movie != null ? new FindMovieResult(movie, MovieMatchType.Id) : null;
         }
 
         private FindMovieResult TryGetMovieByTitleAndOrYear(ParsedMovieInfo parsedMovieInfo)

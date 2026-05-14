@@ -112,6 +112,7 @@ namespace NzbDrone.Core.Parser
 
         private static readonly Regex ReportImdbId = new Regex(@"(?<imdbid>tt\d{7,8})", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex ReportTmdbId = new Regex(@"tmdb(id)?-(?<tmdbid>\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ExplicitTmdbIdRegex = new Regex(@"(?:[\[(]\s*)?\btmdb(?:id)?\s*[-:]\s*(?<tmdbid>\d+)\s*(?:[\])])?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly RegexReplace SimpleTitleRegex = new RegexReplace(@"(?:(480|540|576|720|1080|2160)[ip]|[xh][\W_]?26[45]|DD\W?5\W1|[<>?*]|848x480|1280x720|1920x1080|3840x2160|4096x2160|(8|10)b(it)?|10-bit)\s*?(?![a-b0-9])",
                                                                 string.Empty,
@@ -141,6 +142,67 @@ namespace NzbDrone.Core.Parser
 
         private static readonly Regex MultiRegex = new (@"[_. ](?<multi>multi)[_. ]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        private static int GetExplicitTmdbId(string title)
+        {
+            var match = ExplicitTmdbIdRegex.Match(title);
+
+            if (!match.Success)
+            {
+                return 0;
+            }
+
+            return int.TryParse(match.Groups["tmdbid"].Value, out var tmdbId) ? tmdbId : 0;
+        }
+
+        private static int ExtractExplicitTmdbId(ref string releaseTitle)
+        {
+            var tmdbId = GetExplicitTmdbId(releaseTitle);
+
+            if (tmdbId == 0)
+            {
+                return 0;
+            }
+
+            releaseTitle = ExplicitTmdbIdRegex.Replace(releaseTitle, string.Empty);
+            Logger.Debug("TMDb ID detected: {0}", tmdbId);
+
+            return tmdbId;
+        }
+
+        private static void AddPathTmdbId(ParsedMovieInfo result, FileInfo fileInfo, int fileTmdbId)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            if (fileTmdbId > 0)
+            {
+                result.TmdbId = fileTmdbId;
+                return;
+            }
+
+            if (result.TmdbId > 0)
+            {
+                return;
+            }
+
+            var directory = fileInfo.Directory;
+
+            while (directory != null)
+            {
+                var tmdbId = GetExplicitTmdbId(directory.Name);
+
+                if (tmdbId > 0)
+                {
+                    result.TmdbId = tmdbId;
+                    return;
+                }
+
+                directory = directory.Parent;
+            }
+        }
+
         private static Dictionary<string, string> _umlautMappings = new Dictionary<string, string>
         {
             { "ö", "oe" },
@@ -150,26 +212,42 @@ namespace NzbDrone.Core.Parser
 
         public static ParsedMovieInfo ParseMoviePath(string path)
         {
-            var fileInfo = new FileInfo(path);
+            return ParseMoviePath(path, false);
+        }
 
-            var result = ParseMovieTitle(fileInfo.Name, true);
+        public static ParsedMovieInfo ParseMoviePath(string path, bool parseTmdbId)
+        {
+            var fileInfo = new FileInfo(path);
+            var fileTmdbId = parseTmdbId ? GetExplicitTmdbId(fileInfo.Name) : 0;
+
+            var result = ParseMovieTitle(fileInfo.Name, true, parseTmdbId);
 
             if (result == null)
             {
                 Logger.Debug("Attempting to parse movie info using directory and file names. {0}", fileInfo.Directory.Name);
-                result = ParseMovieTitle(fileInfo.Directory.Name + " " + fileInfo.Name);
+                result = ParseMovieTitle(fileInfo.Directory.Name + " " + fileInfo.Name, false, parseTmdbId);
             }
 
             if (result == null)
             {
                 Logger.Debug("Attempting to parse movie info using directory name. {0}", fileInfo.Directory.Name);
-                result = ParseMovieTitle(fileInfo.Directory.Name + fileInfo.Extension);
+                result = ParseMovieTitle(fileInfo.Directory.Name + fileInfo.Extension, false, parseTmdbId);
+            }
+
+            if (parseTmdbId)
+            {
+                AddPathTmdbId(result, fileInfo, fileTmdbId);
             }
 
             return result;
         }
 
         public static ParsedMovieInfo ParseMovieTitle(string title, bool isDir = false)
+        {
+            return ParseMovieTitle(title, isDir, false);
+        }
+
+        public static ParsedMovieInfo ParseMovieTitle(string title, bool isDir, bool parseTmdbId)
         {
             var originalTitle = title;
             try
@@ -197,6 +275,8 @@ namespace NzbDrone.Core.Parser
                 releaseTitle = releaseTitle.Trim('-', '_');
 
                 releaseTitle = releaseTitle.Replace("【", "[").Replace("】", "]");
+
+                var explicitTmdbId = parseTmdbId ? ExtractExplicitTmdbId(ref releaseTitle) : 0;
 
                 foreach (var replace in ParserCommon.PreSubstitutionRegex)
                 {
@@ -298,7 +378,7 @@ namespace NzbDrone.Core.Parser
                                 result.SimpleReleaseTitle = simpleReleaseTitle;
 
                                 result.ImdbId = ParseImdbId(simpleReleaseTitle);
-                                result.TmdbId = ParseTmdbId(simpleReleaseTitle);
+                                result.TmdbId = explicitTmdbId > 0 ? explicitTmdbId : ParseTmdbId(simpleReleaseTitle);
 
                                 return result;
                             }
@@ -309,6 +389,11 @@ namespace NzbDrone.Core.Parser
                             break;
                         }
                     }
+                }
+
+                if (explicitTmdbId > 0)
+                {
+                    return ParseExplicitTmdbMovieInfo(originalTitle, releaseTitle, explicitTmdbId);
                 }
             }
             catch (Exception e)
@@ -321,6 +406,47 @@ namespace NzbDrone.Core.Parser
 
             Logger.Debug("Unable to parse {0}", title);
             return null;
+        }
+
+        private static ParsedMovieInfo ParseExplicitTmdbMovieInfo(string originalTitle, string releaseTitle, int tmdbId)
+        {
+            var movieTitle = releaseTitle.Replace('.', ' ').Replace('_', ' ');
+            var year = 0;
+
+            var yearMatch = YearInTitleRegex.Match(movieTitle);
+
+            if (yearMatch.Success)
+            {
+                movieTitle = yearMatch.Groups["title"].Value;
+                int.TryParse(yearMatch.Groups["year"].Value, out year);
+            }
+
+            movieTitle = DuplicateSpacesRegex.Replace(movieTitle, " ").Trim(' ', '-', '_', '.', '[', ']', '(', ')');
+            var simpleReleaseTitle = SimpleReleaseTitleRegex.Replace(releaseTitle, string.Empty);
+
+            var result = new ParsedMovieInfo
+            {
+                OriginalTitle = originalTitle,
+                ReleaseTitle = releaseTitle,
+                SimpleReleaseTitle = simpleReleaseTitle,
+                Year = year,
+                TmdbId = tmdbId,
+                ImdbId = ParseImdbId(simpleReleaseTitle),
+                HardcodedSubs = ParseHardcodeSubs(originalTitle),
+                Quality = QualityParser.ParseQuality(originalTitle),
+                ReleaseGroup = ReleaseGroupParser.ParseReleaseGroup(simpleReleaseTitle),
+                Languages = LanguageParser.ParseLanguages(simpleReleaseTitle),
+                Edition = ParseEdition(simpleReleaseTitle)
+            };
+
+            if (movieTitle.IsNotNullOrWhiteSpace())
+            {
+                result.MovieTitles.Add(movieTitle);
+            }
+
+            Logger.Debug("Movie parsed by explicit TMDb ID. {0}", result);
+
+            return result;
         }
 
         public static string ParseImdbId(string title)

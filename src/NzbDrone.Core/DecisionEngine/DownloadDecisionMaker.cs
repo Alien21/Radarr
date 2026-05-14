@@ -76,7 +76,7 @@ namespace NzbDrone.Core.DecisionEngine
 
                 try
                 {
-                    var parsedMovieInfo = Parser.Parser.ParseMovieTitle(report.Title);
+                    var parsedMovieInfo = Parser.Parser.ParseMovieTitle(report.Title, false, _configService.ParseTmdbIdFromReleaseName);
 
                     if (parsedMovieInfo != null && !parsedMovieInfo.PrimaryMovieTitle.IsNullOrWhiteSpace())
                     {

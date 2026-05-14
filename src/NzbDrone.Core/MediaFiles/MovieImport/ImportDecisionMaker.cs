@@ -4,6 +4,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
@@ -31,6 +32,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         private readonly IDetectSample _detectSample;
         private readonly ITrackedDownloadService _trackedDownloadService;
         private readonly ICustomFormatCalculationService _formatCalculator;
+        private readonly IConfigService _configService;
         private readonly Logger _logger;
 
         public ImportDecisionMaker(IEnumerable<IImportDecisionEngineSpecification> specifications,
@@ -40,6 +42,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                                    IDetectSample detectSample,
                                    ITrackedDownloadService trackedDownloadService,
                                    ICustomFormatCalculationService formatCalculator,
+                                   IConfigService configService,
                                    Logger logger)
         {
             _specifications = specifications;
@@ -49,6 +52,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _detectSample = detectSample;
             _trackedDownloadService = trackedDownloadService;
             _formatCalculator = formatCalculator;
+            _configService = configService;
             _logger = logger;
         }
 
@@ -77,7 +81,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
 
             if (downloadClientItem != null)
             {
-                downloadClientItemInfo = Parser.Parser.ParseMovieTitle(downloadClientItem.Title);
+                downloadClientItemInfo = Parser.Parser.ParseMovieTitle(downloadClientItem.Title, false, _configService.ParseTmdbIdFromReleaseName);
             }
 
             var nonSampleVideoFileCount = GetNonSampleVideoFileCount(newFiles, movie.MovieMetadata);
@@ -118,7 +122,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
 
             try
             {
-                var fileMovieInfo = Parser.Parser.ParseMoviePath(localMovie.Path);
+                var fileMovieInfo = Parser.Parser.ParseMoviePath(localMovie.Path, _configService.ParseTmdbIdFromReleaseName);
 
                 localMovie.FileMovieInfo = fileMovieInfo;
                 localMovie.Size = _diskProvider.GetFileSize(localMovie.Path);

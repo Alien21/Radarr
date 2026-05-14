@@ -4,6 +4,7 @@ using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.Movies;
@@ -169,6 +170,41 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         {
             Subject.Map(_umlautInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
             Subject.Map(_umlautAltInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+        }
+
+        [Test]
+        public void should_match_explicit_tmdb_id_when_enabled()
+        {
+            const int tmdbId = 12345;
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.ParseTmdbIdFromReleaseName)
+                  .Returns(true);
+
+            Mocker.GetMock<IMovieService>()
+                  .Setup(s => s.FindByTmdbId(tmdbId))
+                  .Returns(_movie);
+
+            _wrongTitleInfo.TmdbId = tmdbId;
+
+            Subject.Map(_wrongTitleInfo, "", 0, null).Movie.Should().Be(_movie);
+        }
+
+        [Test]
+        public void should_ignore_parsed_tmdb_id_when_disabled()
+        {
+            const int tmdbId = 12345;
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.ParseTmdbIdFromReleaseName)
+                  .Returns(false);
+
+            _wrongTitleInfo.TmdbId = tmdbId;
+
+            Subject.Map(_wrongTitleInfo, "", 0, null).Movie.Should().BeNull();
+
+            Mocker.GetMock<IMovieService>()
+                  .Verify(s => s.FindByTmdbId(tmdbId), Times.Never());
         }
     }
 }

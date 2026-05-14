@@ -33,6 +33,7 @@ namespace Radarr.Api.V3.Config
         public bool UpdateAutomatically { get; set; }
         public UpdateMechanism UpdateMechanism { get; set; }
         public string UpdateScriptPath { get; set; }
+        public bool ParseTmdbIdFromReleaseName { get; set; }
         public bool BlockAutoImportForExistingMovieFiles { get; set; }
         public bool AnalyzeCompletedDownloadFiles { get; set; }
         public bool PreferDualAudio { get; set; }
@@ -81,6 +82,7 @@ namespace Radarr.Api.V3.Config
                 UpdateAutomatically = model.UpdateAutomatically,
                 UpdateMechanism = model.UpdateMechanism,
                 UpdateScriptPath = model.UpdateScriptPath,
+                ParseTmdbIdFromReleaseName = configService.ParseTmdbIdFromReleaseName,
                 BlockAutoImportForExistingMovieFiles = configService.BlockAutoImportForExistingMovieFiles,
                 AnalyzeCompletedDownloadFiles = configService.AnalyzeCompletedDownloadFiles,
                 PreferDualAudio = configService.PreferDualAudio,

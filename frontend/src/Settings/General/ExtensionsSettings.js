@@ -11,13 +11,38 @@ function ExtensionsSettings(props) {
   const { settings, onInputChange } = props;
 
   const {
+    preferDualAudio,
+    parseTmdbIdFromReleaseName,
     blockAutoImportForExistingMovieFiles,
-    analyzeCompletedDownloadFiles,
-    preferDualAudio
+    analyzeCompletedDownloadFiles
   } = settings;
 
   return (
     <FieldSet legend={translate('Extensions')}>
+      <FormGroup size={sizes.MEDIUM}>
+        <FormLabel>{translate('PreferDualAudio')}</FormLabel>
+
+        <FormInputGroup
+          type={inputTypes.CHECK}
+          name="preferDualAudio"
+          helpText={translate('PreferDualAudioHelpText')}
+          onChange={onInputChange}
+          {...preferDualAudio}
+        />
+      </FormGroup>
+
+      <FormGroup size={sizes.MEDIUM}>
+        <FormLabel>{translate('ParseTmdbIdFromReleaseName')}</FormLabel>
+
+        <FormInputGroup
+          type={inputTypes.CHECK}
+          name="parseTmdbIdFromReleaseName"
+          helpText={translate('ParseTmdbIdFromReleaseNameHelpText')}
+          onChange={onInputChange}
+          {...parseTmdbIdFromReleaseName}
+        />
+      </FormGroup>
+
       <FormGroup size={sizes.MEDIUM}>
         <FormLabel>{translate('PreserveDownloadsForExistingMovies')}</FormLabel>
 
@@ -39,18 +64,6 @@ function ExtensionsSettings(props) {
           helpText={translate('AnalyzeCompletedDownloadFilesHelpText')}
           onChange={onInputChange}
           {...analyzeCompletedDownloadFiles}
-        />
-      </FormGroup>
-
-      <FormGroup size={sizes.MEDIUM}>
-        <FormLabel>{translate('PreferDualAudio')}</FormLabel>
-
-        <FormInputGroup
-          type={inputTypes.CHECK}
-          name="preferDualAudio"
-          helpText={translate('PreferDualAudioHelpText')}
-          onChange={onInputChange}
-          {...preferDualAudio}
         />
       </FormGroup>
     </FieldSet>

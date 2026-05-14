@@ -121,7 +121,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     .OrderByDescending(h => h.Date)
                     .ToList();
 
-                var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+                var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title, false, _config.ParseTmdbIdFromReleaseName);
 
                 if (parsedMovieInfo != null)
                 {
@@ -147,7 +147,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     if (parsedMovieInfo == null ||
                         trackedDownload.RemoteMovie?.Movie == null)
                     {
-                        parsedMovieInfo = Parser.Parser.ParseMovieTitle(firstHistoryItem.SourceTitle);
+                        parsedMovieInfo = Parser.Parser.ParseMovieTitle(firstHistoryItem.SourceTitle, false, _config.ParseTmdbIdFromReleaseName);
 
                         if (parsedMovieInfo != null)
                         {
@@ -223,7 +223,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         private void UpdateCachedItem(TrackedDownload trackedDownload)
         {
-            var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+            var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title, false, _config.ParseTmdbIdFromReleaseName);
 
             trackedDownload.RemoteMovie = parsedMovieInfo == null ? null : _parsingService.Map(parsedMovieInfo, "", 0, null);
 

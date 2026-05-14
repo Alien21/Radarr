@@ -422,6 +422,8 @@
     "ProtocolHelpText": "Vyberte, které protokoly použít, a který je preferován při výběru mezi jinak stejnými verzemi",
     "PreferDualAudio": "Upřednostnit duální audio",
     "PreferDualAudioHelpText": "Upřednostní dokončená stahování s audiem v jazyce nastaveném v Movie Info Language a ještě jedním dalším audio jazykem při nahrazování existujícího souboru, který už preferované duální audio nemá. Soubory ve stejné nebo lepší kvalitě se mohou importovat automaticky, pokud nejsou o více než 30 % menší; horší nebo výrazně menší soubory zůstanou ve frontě pro ruční kontrolu.",
+    "ParseTmdbIdFromReleaseName": "Zpracovat TMDb ID z názvu vydání",
+    "ParseTmdbIdFromReleaseNameHelpText": "Použije explicitní značky TMDb ID v názvech vydání a adresářů pro přiřazení filmů před běžným rozpoznáním názvu.",
     "PreserveDownloadsForExistingMovies": "Zachovat stažené soubory pro existující filmy",
     "PreserveDownloadsForExistingMoviesHelpText": "Když dokončené stahování odpovídá filmu, který už má soubor, zablokuje automatický import a nechá ho ve frontě pro ruční kontrolu.",
     "ProxyBypassFilterHelpText": "Použijte ',' jako oddělovač a '*.' jako zástupný znak pro subdomény",

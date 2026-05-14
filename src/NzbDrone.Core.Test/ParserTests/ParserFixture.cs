@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using FluentAssertions;
 using FluentAssertions.Execution;
@@ -75,6 +76,54 @@ namespace NzbDrone.Core.Test.ParserTests
         public void should_normalize_movie_lookup_term(string postTitle, string title)
         {
             Parser.Parser.NormalizeMovieLookupTerm(postTitle).Should().Be(title);
+        }
+
+        [Test]
+        public void should_not_parse_colon_tmdb_id_when_disabled()
+        {
+            var movie = Parser.Parser.ParseMovieTitle("Wrong.Movie.[tmdb:12345].2020.1080p.mkv");
+
+            movie.TmdbId.Should().Be(0);
+        }
+
+        [Test]
+        public void should_parse_tmdb_id_from_release_name_when_enabled()
+        {
+            var movie = Parser.Parser.ParseMovieTitle("Wrong.Movie.[tmdb:12345].2020.1080p.mkv", false, true);
+
+            using (new AssertionScope())
+            {
+                movie.TmdbId.Should().Be(12345);
+                movie.PrimaryMovieTitle.Should().Be("Wrong Movie");
+                movie.ReleaseTitle.Should().NotContain("tmdb");
+            }
+        }
+
+        [Test]
+        public void should_parse_tmdb_id_from_parent_folder_when_enabled()
+        {
+            var path = Path.Combine("Wrong Movie [tmdb:12345]", "Movie.2020.1080p.mkv");
+            var movie = Parser.Parser.ParseMoviePath(path, true);
+
+            movie.TmdbId.Should().Be(12345);
+        }
+
+        [Test]
+        public void should_prefer_file_tmdb_id_over_parent_folder_tmdb_id()
+        {
+            var path = Path.Combine("Wrong Movie [tmdb:12345]", "Movie.[tmdb:67890].2020.1080p.mkv");
+            var movie = Parser.Parser.ParseMoviePath(path, true);
+
+            movie.TmdbId.Should().Be(67890);
+        }
+
+        [Test]
+        public void should_parse_tmdb_id_from_folder_without_year_when_enabled()
+        {
+            var path = Path.Combine("Wrong Movie [tmdb:12345]", "Movie.mkv");
+            var movie = Parser.Parser.ParseMoviePath(path, true);
+
+            movie.TmdbId.Should().Be(12345);
         }
 
         [TestCase("[MTBB] Kimi no Na wa. (2016) v2 [97681524].mkv", "Kimi no Na wa", "MTBB", 2016)]

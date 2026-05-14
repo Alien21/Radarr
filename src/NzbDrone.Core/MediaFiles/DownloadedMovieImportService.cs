@@ -125,7 +125,7 @@ namespace NzbDrone.Core.MediaFiles
                 foreach (var videoFile in videoFiles)
                 {
                     var movieParseResult =
-                        Parser.Parser.ParseMovieTitle(Path.GetFileName(videoFile));
+                        Parser.Parser.ParseMovieTitle(Path.GetFileName(videoFile), false, _config.ParseTmdbIdFromReleaseName);
 
                     if (movieParseResult == null)
                     {
@@ -192,7 +192,7 @@ namespace NzbDrone.Core.MediaFiles
             var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
             var historyItems = _historyService.FindByDownloadId(downloadClientItem?.DownloadId ?? "");
             var firstHistoryItem = historyItems?.OrderByDescending(h => h.Date).FirstOrDefault();
-            var folderInfo = Parser.Parser.ParseMovieTitle(cleanedUpName);
+            var folderInfo = Parser.Parser.ParseMovieTitle(cleanedUpName, false, _config.ParseTmdbIdFromReleaseName);
 
             if (folderInfo != null)
             {

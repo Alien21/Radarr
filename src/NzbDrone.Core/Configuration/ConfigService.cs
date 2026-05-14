@@ -431,6 +431,8 @@ namespace NzbDrone.Core.Configuration
 
         public string HmacSalt => GetValue("HmacSalt", Guid.NewGuid().ToString(), true);
 
+        public bool ParseTmdbIdFromReleaseName => GetValueBoolean("ParseTmdbIdFromReleaseName", false);
+
         public bool BlockAutoImportForExistingMovieFiles => GetValueBoolean("BlockAutoImportForExistingMovieFiles", false);
 
         public bool AnalyzeCompletedDownloadFiles => GetValueBoolean("AnalyzeCompletedDownloadFiles", false);

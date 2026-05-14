@@ -156,7 +156,7 @@ namespace NzbDrone.Core.Download
 
             if (trackedDownload.RemoteMovie == null)
             {
-                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title, false, _configService.ParseTmdbIdFromReleaseName);
                 if (parsed != null)
                 {
                     trackedDownload.RemoteMovie = _parsingService.Map(parsed, "", 0);
@@ -744,7 +744,7 @@ namespace NzbDrone.Core.Download
             if (_diskProvider.FolderExists(outputPath))
             {
                 var directoryInfo = new DirectoryInfo(outputPath);
-                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name));
+                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name), false, _configService.ParseTmdbIdFromReleaseName);
                 var videoFiles = _diskScanService.FilterPaths(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName)).ToList();
 
                 return videoFiles
@@ -765,7 +765,7 @@ namespace NzbDrone.Core.Download
 
         private LocalMovie GetCompletedDownloadQueueMovie(TrackedDownload trackedDownload, string videoFile, ParsedMovieInfo folderInfo)
         {
-            var fileInfo = Parser.Parser.ParseMoviePath(videoFile);
+            var fileInfo = Parser.Parser.ParseMoviePath(videoFile, _configService.ParseTmdbIdFromReleaseName);
 
             var localMovie = new LocalMovie
             {
@@ -795,7 +795,7 @@ namespace NzbDrone.Core.Download
             if (_diskProvider.FolderExists(outputPath))
             {
                 var directoryInfo = new DirectoryInfo(outputPath);
-                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name));
+                var folderInfo = Parser.Parser.ParseMovieTitle(GetCleanedUpFolderName(directoryInfo.Name), false, _configService.ParseTmdbIdFromReleaseName);
                 var videoFiles = _diskScanService.FilterPaths(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName)).ToList();
 
                 return _importDecisionMaker.GetImportDecisions(videoFiles, movie, trackedDownload.ImportItem, folderInfo, true);
@@ -900,7 +900,7 @@ namespace NzbDrone.Core.Download
                 matchingFiles = subtitleFiles
                     .Where(file =>
                     {
-                        var fileMovieInfo = Parser.Parser.ParseMoviePath(file);
+                        var fileMovieInfo = Parser.Parser.ParseMoviePath(file, _configService.ParseTmdbIdFromReleaseName);
 
                         return fileMovieInfo?.MovieTitle == localMovie.FileMovieInfo.MovieTitle &&
                                fileMovieInfo.Year.Equals(localMovie.FileMovieInfo.Year);
@@ -983,7 +983,7 @@ namespace NzbDrone.Core.Download
         {
             if (trackedDownload.RemoteMovie == null)
             {
-                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title);
+                var parsed = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title, false, _configService.ParseTmdbIdFromReleaseName);
                 trackedDownload.RemoteMovie = parsed != null
                     ? _parsingService.Map(parsed, movie.Id)
                     : new RemoteMovie { Movie = movie };
