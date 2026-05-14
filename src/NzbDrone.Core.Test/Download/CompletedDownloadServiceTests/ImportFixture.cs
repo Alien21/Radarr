@@ -217,6 +217,7 @@ namespace NzbDrone.Core.Test.Download
                 .Verify(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()), Times.Never());
 
             AssertNotImported();
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]

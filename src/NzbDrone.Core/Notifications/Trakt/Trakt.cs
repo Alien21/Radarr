@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using FluentValidation.Results;
 using NLog;
@@ -282,7 +283,7 @@ namespace NzbDrone.Core.Notifications.Trakt
 
         private string MapAudioChannels(MovieFile movieFile)
         {
-            var audioChannels = movieFile.MediaInfo != null ? MediaInfoFormatter.FormatAudioChannels(movieFile.MediaInfo).ToString("0.0") : string.Empty;
+            var audioChannels = movieFile.MediaInfo != null ? MediaInfoFormatter.FormatAudioChannels(movieFile.MediaInfo).ToString("0.0", CultureInfo.InvariantCulture) : string.Empty;
 
             if (audioChannels == "0.0")
             {

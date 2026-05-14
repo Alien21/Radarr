@@ -24,13 +24,16 @@ namespace NzbDrone.Common.Test
 
             Mocker.SetConstant<IProcessProvider>(Mocker.Resolve<ProcessProvider>());
 
-            CleanupService();
+            if (IsAnAdministrator())
+            {
+                CleanupService();
+            }
         }
 
         [TearDown]
         public void TearDown()
         {
-            if (OsInfo.IsWindows)
+            if (OsInfo.IsWindows && IsAnAdministrator())
             {
                 CleanupService();
             }
@@ -64,10 +67,7 @@ namespace NzbDrone.Common.Test
         [Test]
         public void Service_should_be_installed_and_then_uninstalled()
         {
-            if (!IsAnAdministrator())
-            {
-                Assert.Inconclusive("Can't run test without Administrator rights");
-            }
+            RequireAdministrator();
 
             Subject.ServiceExist(TEMP_SERVICE_NAME).Should().BeFalse("Service already installed");
             Subject.Install(TEMP_SERVICE_NAME);
@@ -110,10 +110,7 @@ namespace NzbDrone.Common.Test
         [Test]
         public void should_throw_if_starting_a_running_service()
         {
-            if (!IsAnAdministrator())
-            {
-                Assert.Inconclusive("Can't run test without Administrator rights");
-            }
+            RequireAdministrator();
 
             Subject.GetService(ALWAYS_INSTALLED_SERVICE).Status
                .Should().NotBe(ServiceControllerStatus.Running);
@@ -127,6 +124,8 @@ namespace NzbDrone.Common.Test
         [Test]
         public void Should_log_warn_if_on_stop_if_service_is_already_stopped()
         {
+            RequireAdministrator();
+
             Subject.GetService(ALWAYS_INSTALLED_SERVICE).Status
                 .Should().NotBe(ServiceControllerStatus.Running);
 
@@ -136,6 +135,14 @@ namespace NzbDrone.Common.Test
                 .Should().Be(ServiceControllerStatus.Stopped);
 
             ExceptionVerification.ExpectedWarns(1);
+        }
+
+        private static void RequireAdministrator()
+        {
+            if (!IsAnAdministrator())
+            {
+                Assert.Inconclusive("Can't run test without Administrator rights");
+            }
         }
 
         private static bool IsAnAdministrator()

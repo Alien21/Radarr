@@ -141,6 +141,12 @@ namespace NzbDrone.Common.Test
             {
                 var result = Subject.StartAndCapture(tempScript);
 
+                if (!result.Standard.Any() &&
+                    result.Error.Any(e => e.Content.Contains("Python was not found", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Assert.Inconclusive("No Python available");
+                }
+
                 result.Standard.First().Content.Should().Be("Hello There");
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 2)

@@ -36,6 +36,7 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
             }
 
             var audioFormat = mediaInfo.AudioFormat;
+            var normalizedAudioFormat = audioFormat.ToLowerInvariant();
             var audioCodecID = mediaInfo.AudioCodecID ?? string.Empty;
             var audioProfile = mediaInfo.AudioProfile ?? string.Empty;
 
@@ -50,17 +51,17 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
                 return "TrueHD Atmos";
             }
 
-            if (audioFormat == "truehd")
+            if (normalizedAudioFormat == "truehd")
             {
                 return "TrueHD";
             }
 
-            if (audioFormat == "flac")
+            if (normalizedAudioFormat == "flac")
             {
                 return "FLAC";
             }
 
-            if (audioFormat == "dts")
+            if (normalizedAudioFormat == "dts")
             {
                 if (audioProfile == "DTS:X")
                 {
@@ -100,17 +101,17 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
                 return "EAC3 Atmos";
             }
 
-            if (audioFormat == "eac3")
+            if (normalizedAudioFormat == "eac3")
             {
                 return "EAC3";
             }
 
-            if (audioFormat == "ac3")
+            if (normalizedAudioFormat == "ac3")
             {
                 return "AC3";
             }
 
-            if (audioFormat == "aac")
+            if (normalizedAudioFormat == "aac")
             {
                 if (audioCodecID == "A_AAC/MPEG4/LC/SBR")
                 {
@@ -120,34 +121,34 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
                 return "AAC";
             }
 
-            if (audioFormat == "mp3")
+            if (normalizedAudioFormat == "mp3")
             {
                 return "MP3";
             }
 
-            if (audioFormat == "mp2")
+            if (normalizedAudioFormat == "mp2")
             {
                 return "MP2";
             }
 
-            if (audioFormat == "opus")
+            if (normalizedAudioFormat == "opus")
             {
                 return "Opus";
             }
 
-            if (audioFormat.StartsWith("pcm_") || audioFormat.StartsWith("adpcm_"))
+            if (normalizedAudioFormat.StartsWith("pcm_") || normalizedAudioFormat.StartsWith("adpcm_"))
             {
                 return "PCM";
             }
 
-            if (audioFormat == "vorbis")
+            if (normalizedAudioFormat == "vorbis")
             {
                 return "Vorbis";
             }
 
-            if (audioFormat == "wmav1" ||
-                audioFormat == "wmav2" ||
-                audioFormat == "wmapro")
+            if (normalizedAudioFormat == "wmav1" ||
+                normalizedAudioFormat == "wmav2" ||
+                normalizedAudioFormat == "wmapro")
             {
                 return "WMA";
             }
