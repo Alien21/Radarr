@@ -1,3 +1,4 @@
+import jdu from 'jdu';
 import { throttle } from 'lodash';
 import React, {
   useCallback,
@@ -74,6 +75,14 @@ const columns = [
 ];
 
 const bodyPadding = parseInt(dimensions.pageContentBodyPadding);
+
+function normalizeMovieFilterValue(value: string | undefined | null) {
+  return jdu
+    .replace(value ?? '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+    .trim();
+}
 
 interface SelectMovieModalContentProps {
   modalTitle: string;
@@ -199,18 +208,28 @@ function SelectMovieModalContent(props: SelectMovieModalContentProps) {
   );
 
   const items = useMemo(() => {
-    const filterValue = filter.toLowerCase();
+    const filterValue = normalizeMovieFilterValue(filter);
+    const idFilterValue = filter.trim().toLowerCase();
 
-    return sortedMovies.filter(
-      (item) =>
-        item.title.toLowerCase().includes(filterValue) ||
-        item.originalTitle?.toLowerCase().includes(filterValue) ||
-        item.alternateTitles?.some((title) =>
-          title.title.toLowerCase().includes(filterValue)
+    if (!filterValue && !idFilterValue) {
+      return sortedMovies;
+    }
+
+    return sortedMovies.filter((item) => {
+      const movieTitles = [
+        item.title,
+        item.originalTitle,
+        ...(item.alternateTitles ?? []).map(({ title }) => title),
+      ];
+
+      return (
+        movieTitles.some((title) =>
+          normalizeMovieFilterValue(title).includes(filterValue)
         ) ||
-        item.tmdbId.toString().includes(filter) ||
-        item.imdbId?.includes(filter)
-    );
+        item.tmdbId.toString().includes(idFilterValue) ||
+        item.imdbId?.toLowerCase().includes(idFilterValue)
+      );
+    });
   }, [sortedMovies, filter]);
 
   return (
