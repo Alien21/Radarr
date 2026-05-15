@@ -56,16 +56,16 @@ namespace NzbDrone.Core.Queue
 
         private Queue MapMovie(TrackedDownload trackedDownload, Movie movie)
         {
-            var languages = trackedDownload.RemoteMovie?.Languages;
+            var languages = trackedDownload.AnalyzedLanguages;
             if (languages == null || !languages.Any() || languages.All(l => l == Language.Unknown))
             {
-                languages = trackedDownload.AnalyzedLanguages;
+                languages = trackedDownload.RemoteMovie?.Languages;
             }
 
-            var quality = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Quality;
+            var quality = trackedDownload.AnalyzedQuality;
             if (quality == null || quality.Quality == Quality.Unknown)
             {
-                quality = trackedDownload.AnalyzedQuality;
+                quality = trackedDownload.RemoteMovie?.ParsedMovieInfo?.Quality;
             }
 
             var queue = new Queue
