@@ -37,6 +37,7 @@ namespace Radarr.Api.V3.Config
         public bool BlockAutoImportForExistingMovieFiles { get; set; }
         public bool AnalyzeCompletedDownloadFiles { get; set; }
         public bool PreferDualAudio { get; set; }
+        public bool AllowAutomaticImport { get; set; }
         public bool ProxyEnabled { get; set; }
         public ProxyType ProxyType { get; set; }
         public string ProxyHostname { get; set; }
@@ -86,6 +87,7 @@ namespace Radarr.Api.V3.Config
                 BlockAutoImportForExistingMovieFiles = configService.BlockAutoImportForExistingMovieFiles,
                 AnalyzeCompletedDownloadFiles = configService.AnalyzeCompletedDownloadFiles,
                 PreferDualAudio = configService.PreferDualAudio,
+                AllowAutomaticImport = configService.AllowAutomaticImport,
                 ProxyEnabled = configService.ProxyEnabled,
                 ProxyType = configService.ProxyType,
                 ProxyHostname = configService.ProxyHostname,

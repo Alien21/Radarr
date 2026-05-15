@@ -124,35 +124,25 @@ function MediaManagement() {
   }, 0);
 
   const defaultRootFolderForAutoImportOptions: EnhancedSelectInputValue<string>[] =
-    [
-      {
-        key: '',
+    rootFolderItems.map((rootFolder) => {
+      return {
+        key: rootFolder.path,
         get value() {
-          return translate('DisableAutomaticImport');
-        },
-      },
-      ...rootFolderItems.map((rootFolder) => {
-        return {
-          key: rootFolder.path,
-          get value() {
-            const freeSpaceValue =
-              typeof rootFolder.freeSpace === 'number'
-                ? rootFolder.freeSpace
-                : 0;
-            const freeSpaceText =
-              !rootFolder.accessible || rootFolder.freeSpace === undefined
-                ? '-'
-                : formatBytes(freeSpaceValue);
+          const freeSpaceValue =
+            typeof rootFolder.freeSpace === 'number' ? rootFolder.freeSpace : 0;
+          const freeSpaceText =
+            !rootFolder.accessible || rootFolder.freeSpace === undefined
+              ? '-'
+              : formatBytes(freeSpaceValue);
 
-            const paddedPath = (rootFolder.path ?? '').padEnd(
-              maxPathLength,
-              '\u00A0'
-            ); // NBSP
-            return `${paddedPath}\u00A0\u00A0(${freeSpaceText})`;
-          },
-        };
-      }),
-    ];
+          const paddedPath = (rootFolder.path ?? '').padEnd(
+            maxPathLength,
+            '\u00A0'
+          ); // NBSP
+          return `${paddedPath}\u00A0\u00A0(${freeSpaceText})`;
+        },
+      };
+    });
 
   const handleSavePress = useCallback(() => {
     dispatch(saveMediaManagementSettings());

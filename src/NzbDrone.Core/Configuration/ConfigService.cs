@@ -439,6 +439,8 @@ namespace NzbDrone.Core.Configuration
 
         public bool PreferDualAudio => GetValueBoolean("PreferDualAudio", false);
 
+        public bool AllowAutomaticImport => GetValueBoolean("AllowAutomaticImport", false);
+
         public bool ProxyEnabled => GetValueBoolean("ProxyEnabled", false);
 
         public ProxyType ProxyType => GetValueEnum<ProxyType>("ProxyType", ProxyType.Http);

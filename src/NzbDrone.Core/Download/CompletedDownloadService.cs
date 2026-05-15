@@ -173,6 +173,12 @@ namespace NzbDrone.Core.Download
 
             if (movie == null)
             {
+                if (!AllowAutomaticImport(trackedDownload))
+                {
+                    AnalyzeCompletedDownloadFile(trackedDownload);
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(_configService.DefaultRootFolderForAutoImport))
                 {
                     trackedDownload.Warn("Auto-import blocked: no default root folder configured for auto-import.");
@@ -307,6 +313,19 @@ namespace NzbDrone.Core.Download
             AnalyzeCompletedDownloadFile(trackedDownload);
 
             trackedDownload.State = TrackedDownloadState.ImportPending;
+        }
+
+        private bool AllowAutomaticImport(TrackedDownload trackedDownload)
+        {
+            if (_configService.AllowAutomaticImport)
+            {
+                return true;
+            }
+
+            trackedDownload.Warn("Auto-import blocked: automatic import is disabled.");
+            _logger.Debug("Auto-import blocked: automatic import is disabled.");
+            SetStateToImportBlocked(trackedDownload);
+            return false;
         }
 
         public void Import(TrackedDownload trackedDownload)

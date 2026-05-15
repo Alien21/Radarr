@@ -1529,6 +1529,8 @@
   "ProtocolHelpText": "Choose which protocol(s) to use and which one is preferred when choosing between otherwise equal releases",
   "PreferDualAudio": "Prefer Dual Audio",
   "PreferDualAudioHelpText": "Prefer completed downloads with the configured Movie Info Language audio plus another audio language when replacing an existing movie file that does not already have preferred dual audio. Same or better quality files can import automatically if they are not more than 30% smaller; lower quality or much smaller files stay in the queue for manual review.",
+  "AllowAutomaticImport": "Allow Automatic Import",
+  "AllowAutomaticImportHelpText": "Allow Radarr to resolve unmatched completed downloads, add the matching movie using the configured automatic import root folder and quality profile, and import them automatically. When disabled, only downloads already matched to an existing movie can import automatically.",
   "PreserveDownloadsForExistingMovies": "Preserve Downloads for Existing Movies",
   "PreserveDownloadsForExistingMoviesHelpText": "When a completed download matches a movie that already has a file, block automatic import and leave it in the queue for manual review.",
   "Proxy": "Proxy",
@@ -2054,6 +2056,5 @@
   "YesCancel": "Yes, Cancel",
   "Yesterday": "Yesterday",
   "YesterdayAt": "Yesterday at {time}",
-  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`",
-  "DisableAutomaticImport": "Disable Automatic Import"
+  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`"
 }

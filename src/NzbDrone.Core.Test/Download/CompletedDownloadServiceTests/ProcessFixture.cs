@@ -4,11 +4,13 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Disk;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -179,6 +181,31 @@ namespace NzbDrone.Core.Test.Download.CompletedDownloadServiceTests
 
             AssertNotReadyToImport();
             ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_not_auto_import_unmatched_download_when_automatic_import_is_disabled()
+        {
+            _trackedDownload.DownloadItem.Category = "movies";
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.AllowAutomaticImport)
+                  .Returns(false);
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.DefaultRootFolderForAutoImport)
+                  .Returns(@"C:\Movies".AsOsAgnostic());
+
+            Mocker.GetMock<IParsingService>()
+                  .Setup(s => s.GetMovie("Drone.S01E01.HDTV"))
+                  .Returns((Movie)null);
+
+            Subject.Check(_trackedDownload);
+
+            AssertNotReadyToImport();
+
+            Mocker.GetMock<ISearchForNewMovie>()
+                  .Verify(v => v.SearchForNewMovie(It.IsAny<string>()), Times.Never());
         }
 
         private void AssertNotReadyToImport()
