@@ -36,6 +36,15 @@ namespace NzbDrone.Core.Download
 
     public class CompletedDownloadService : ICompletedDownloadService
     {
+        private static readonly HashSet<ImportRejectionReason> GenericExistingMovieImportRejectionReasons = new HashSet<ImportRejectionReason>
+        {
+            ImportRejectionReason.UnknownMovie,
+            ImportRejectionReason.MovieAlreadyImported,
+            ImportRejectionReason.NotQualityUpgrade,
+            ImportRejectionReason.NotRevisionUpgrade,
+            ImportRejectionReason.NotCustomFormatUpgrade
+        };
+
         private readonly IEventAggregator _eventAggregator;
         private readonly IHistoryService _historyService;
         private readonly IProvideImportItemService _provideImportItemService;
@@ -525,9 +534,22 @@ namespace NzbDrone.Core.Download
 
             AnalyzeCompletedDownloadFile(trackedDownload);
 
-            if (ShouldBypassExistingMovieAutoImportBlock(trackedDownload, movie))
+            var importDecisions = GetExistingMovieAutoImportDecisions(trackedDownload, movie);
+
+            if (ShouldBypassExistingMovieAutoImportBlock(importDecisions, movie))
             {
                 return false;
+            }
+
+            var importDecisionBlockReason = GetExistingMovieAutoImportDecisionBlockReason(importDecisions, movie);
+            if (importDecisionBlockReason.IsNotNullOrWhiteSpace())
+            {
+                var importDecisionBlockMessage = FormatAutoImportBlockReason(importDecisionBlockReason);
+
+                trackedDownload.Warn("Auto-import blocked: {0}", importDecisionBlockMessage);
+                _logger.Warn("Auto-import blocked: '{0}' tmdbid: {1} import rejected while replacing existing movie file: {2}", movie.Title, movie.TmdbId, importDecisionBlockReason);
+                SetStateToImportBlocked(trackedDownload);
+                return true;
             }
 
             trackedDownload.Warn("Auto-import blocked: '{0}' already has a movie file in library (tmdbid: {1}).", movie.Title, movie.TmdbId);
@@ -623,15 +645,24 @@ namespace NzbDrone.Core.Download
             return false;
         }
 
-        private bool ShouldBypassExistingMovieAutoImportBlock(TrackedDownload trackedDownload, Movie movie)
+        private List<ImportDecision> GetExistingMovieAutoImportDecisions(TrackedDownload trackedDownload, Movie movie)
         {
             if (trackedDownload.ImportItem == null ||
                 trackedDownload.ImportItem.OutputPath.FullPath.IsNullOrWhiteSpace())
             {
+                return new List<ImportDecision>();
+            }
+
+            return GetCompletedDownloadImportDecisions(trackedDownload, movie, trackedDownload.ImportItem.OutputPath.FullPath);
+        }
+
+        private bool ShouldBypassExistingMovieAutoImportBlock(List<ImportDecision> decisions, Movie movie)
+        {
+            if (decisions.Empty())
+            {
                 return false;
             }
 
-            var decisions = GetCompletedDownloadImportDecisions(trackedDownload, movie, trackedDownload.ImportItem.OutputPath.FullPath);
             var qualityUpgradeDecision = GetApprovedQualityUpgradeDecision(decisions, movie);
 
             if (qualityUpgradeDecision != null)
@@ -652,15 +683,8 @@ namespace NzbDrone.Core.Download
             }
 
             var preferredDualAudioDecision = decisions.FirstOrDefault(decision =>
-            {
-                if (!decision.Approved)
-                {
-                    return false;
-                }
-
-                var dualAudioPreference = _dualAudioImportPreference.Evaluate(decision.LocalMovie, movie.MovieFile);
-                return dualAudioPreference?.IsPreferredUpgrade == true;
-            });
+                decision.Approved &&
+                IsPreferredDualAudioUpgradeDecision(decision, movie));
 
             if (preferredDualAudioDecision == null)
             {
@@ -673,19 +697,63 @@ namespace NzbDrone.Core.Download
 
         private ImportDecision GetApprovedQualityUpgradeDecision(List<ImportDecision> decisions, Movie movie)
         {
+            return decisions.FirstOrDefault(decision =>
+                decision.Approved &&
+                IsQualityUpgradeDecision(decision, movie));
+        }
+
+        private string GetExistingMovieAutoImportDecisionBlockReason(List<ImportDecision> decisions, Movie movie)
+        {
+            var rejectionMessages = decisions
+                .Where(decision => IsExistingMovieAutoImportBypassCandidate(decision, movie))
+                .SelectMany(decision => decision.Rejections)
+                .Where(rejection => !GenericExistingMovieImportRejectionReasons.Contains(rejection.Reason))
+                .Select(rejection => rejection.Message)
+                .Where(message => message.IsNotNullOrWhiteSpace())
+                .Distinct()
+                .ToList();
+
+            return rejectionMessages.Any() ? string.Join("; ", rejectionMessages) : null;
+        }
+
+        private bool IsExistingMovieAutoImportBypassCandidate(ImportDecision decision, Movie movie)
+        {
+            return IsQualityUpgradeDecision(decision, movie) ||
+                   IsPreferredDualAudioUpgradeDecision(decision, movie);
+        }
+
+        private bool IsQualityUpgradeDecision(ImportDecision decision, Movie movie)
+        {
             if (movie.MovieFile?.Quality == null ||
                 movie.QualityProfile == null)
             {
-                return null;
+                return false;
             }
 
             var qualityComparer = new QualityModelComparer(movie.QualityProfile);
 
-            return decisions.FirstOrDefault(decision =>
-                decision.Approved &&
-                decision.LocalMovie?.Quality != null &&
-                !ReplacesPreferredDualAudioWithNonDual(decision.LocalMovie, movie.MovieFile) &&
-                qualityComparer.Compare(decision.LocalMovie.Quality, movie.MovieFile.Quality) > 0);
+            return decision.LocalMovie?.Quality != null &&
+                   !ReplacesPreferredDualAudioWithNonDual(decision.LocalMovie, movie.MovieFile) &&
+                   qualityComparer.Compare(decision.LocalMovie.Quality, movie.MovieFile.Quality) > 0;
+        }
+
+        private bool IsPreferredDualAudioUpgradeDecision(ImportDecision decision, Movie movie)
+        {
+            if (!_configService.PreferDualAudio ||
+                decision.LocalMovie == null ||
+                movie.MovieFile == null)
+            {
+                return false;
+            }
+
+            var dualAudioPreference = _dualAudioImportPreference.Evaluate(decision.LocalMovie, movie.MovieFile);
+
+            return dualAudioPreference?.IsPreferredUpgrade == true;
+        }
+
+        private static string FormatAutoImportBlockReason(string reason)
+        {
+            return reason.EndsWith(".") ? reason : $"{reason}.";
         }
 
         private bool ReplacesPreferredDualAudioWithNonDual(LocalMovie localMovie, MovieFile existingMovieFile)

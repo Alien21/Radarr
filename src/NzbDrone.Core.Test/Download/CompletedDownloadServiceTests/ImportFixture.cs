@@ -396,6 +396,61 @@ namespace NzbDrone.Core.Test.Download
             AssertImported();
         }
 
+        [Test]
+        public void should_report_import_decision_rejection_when_existing_movie_auto_import_upgrade_is_blocked()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.BlockAutoImportForExistingMovieFiles)
+                .Returns(true);
+
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.PreferDualAudio)
+                .Returns(true);
+
+            var outputPath = @"C:\DropFolder\MyDownload.mkv".AsOsAgnostic();
+            _trackedDownload.DownloadItem.OutputPath = new OsPath(outputPath);
+
+            var movie = _trackedDownload.RemoteMovie.Movie;
+            movie.MovieFileId = 1;
+            movie.MovieFile = new MovieFile();
+
+            var localMovie = new LocalMovie
+            {
+                Path = outputPath,
+                Movie = movie
+            };
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.FileExists(outputPath))
+                .Returns(true);
+
+            Mocker.GetMock<IMakeImportDecision>()
+                .Setup(v => v.GetImportDecisions(It.IsAny<List<string>>(), movie, _trackedDownload.DownloadItem, null, true))
+                .Returns(new List<ImportDecision>
+                {
+                    new ImportDecision(localMovie, new ImportRejection(ImportRejectionReason.MinimumFreeSpace, "Not enough free space"))
+                });
+
+            Mocker.GetMock<IDualAudioImportPreference>()
+                .Setup(v => v.Evaluate(localMovie, movie.MovieFile))
+                .Returns(new DualAudioImportPreferenceResult
+                {
+                    Applies = true,
+                    IsPreferredUpgrade = true
+                });
+
+            Subject.Import(_trackedDownload);
+
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Verify(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()), Times.Never());
+
+            _trackedDownload.StatusMessages.Should().ContainSingle();
+            _trackedDownload.StatusMessages[0].Messages.Should().ContainSingle("Auto-import blocked: Not enough free space.");
+
+            AssertNotImported();
+            ExceptionVerification.ExpectedWarns(1);
+        }
+
         private void AssertNotImported()
         {
             Mocker.GetMock<IEventAggregator>()
