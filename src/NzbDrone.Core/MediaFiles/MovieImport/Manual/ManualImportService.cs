@@ -389,7 +389,9 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 
         private ManualImportExistingMovieFile GetExistingMovieFile(LocalMovie localMovie)
         {
-            if (localMovie?.Movie?.MovieFileId <= 0 || localMovie.Movie.MovieFile == null)
+            if (localMovie?.Movie == null ||
+                localMovie.Movie.MovieFileId <= 0 ||
+                localMovie.Movie.MovieFile == null)
             {
                 return null;
             }
