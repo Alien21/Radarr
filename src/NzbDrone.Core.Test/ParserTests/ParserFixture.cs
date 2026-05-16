@@ -5,6 +5,7 @@ using FluentAssertions.Execution;
 using NUnit.Framework;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.Parser;
+using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.ParserTests
@@ -64,6 +65,8 @@ namespace NzbDrone.Core.Test.ParserTests
         [TestCase("www.Torrenting.org - Movie.2008.720p.X264-DIMENSION", "Movie")]
         [TestCase("The.French.Movie.2013.720p.BluRay.x264 - ROUGH[PublicHD]", "The French Movie")]
         [TestCase("The.Good.German.2006.720p.BluRay.x264-RlsGrp", "The Good German", Description = "Hardcoded to exclude from German regex")]
+        [TestCase("It CZ WebRip 720p 2017.mkv", "It")]
+        [TestCase("Mad Max NF WebRip 720p 2015.mkv", "Mad Max")]
         public void should_parse_movie_title(string postTitle, string title)
         {
             Parser.Parser.ParseMovieTitle(postTitle).PrimaryMovieTitle.Should().Be(title);
@@ -76,6 +79,19 @@ namespace NzbDrone.Core.Test.ParserTests
         public void should_normalize_movie_lookup_term(string postTitle, string title)
         {
             Parser.Parser.NormalizeMovieLookupTerm(postTitle).Should().Be(title);
+        }
+
+        [Test]
+        public void should_trim_language_token_before_source_from_movie_title()
+        {
+            var movie = Parser.Parser.ParseMovieTitle("Lovci ve zvireci risi CZ WebRip 720p 2019 Dokument.mp4");
+
+            using (new AssertionScope())
+            {
+                movie.PrimaryMovieTitle.Should().Be("Lovci ve zvireci risi");
+                movie.Year.Should().Be(2019);
+                movie.Quality.Quality.Should().Be(Quality.WEBRip720p);
+            }
         }
 
         [Test]

@@ -135,6 +135,8 @@ namespace NzbDrone.Core.Parser
         private static readonly Regex DuplicateSpacesRegex = new Regex(@"\s{2,}", RegexOptions.Compiled);
         private static readonly Regex LookupAbbreviationRegex = new Regex(@"\b(mr|mrs|ms|dr|prof|st|jr|sr)\.(?=\S)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex LookupSeparatorRegex = new Regex(@"\.(?=\S)", RegexOptions.Compiled);
+        private static readonly Regex LookupAdjacentReleaseTokenRegex = new Regex(@"^(?:CZ|CS|SK|EN|DE|PL|BG|LT|ES|FR|FRE|FRA|ITA|JAP|KOR|HIN|RUS|RU|UKR|AMZN|NF|DSNP|HMAX|HBO|iTunes|INTERNAL|PROPER|REPACK\d*|RERIP\d*)$",
+                                                                            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Regex RequestInfoRegex = new Regex(@"^(?:\[.+?\])+", RegexOptions.Compiled);
 
@@ -648,7 +650,14 @@ namespace NzbDrone.Core.Parser
 
                 if (QualityParser.ParseQualityName(suffix).Quality != Quality.Unknown)
                 {
-                    return string.Join(" ", parts.Take(i));
+                    var titlePartEnd = i;
+
+                    while (titlePartEnd > 0 && LookupAdjacentReleaseTokenRegex.IsMatch(parts[titlePartEnd - 1].Trim('-', '_', '.', '[', ']', '(', ')')))
+                    {
+                        titlePartEnd--;
+                    }
+
+                    return string.Join(" ", parts.Take(titlePartEnd));
                 }
             }
 
@@ -718,7 +727,7 @@ namespace NzbDrone.Core.Parser
                 n++;
             }
 
-            movieName = movieName.Trim(' ');
+            movieName = TrimLookupReleaseSuffix(movieName.Trim(' '));
 
             int.TryParse(matchCollection[0].Groups["year"].Value, out var airYear);
 
