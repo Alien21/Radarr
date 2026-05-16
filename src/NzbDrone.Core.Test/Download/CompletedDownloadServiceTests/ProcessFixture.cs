@@ -60,6 +60,10 @@ namespace NzbDrone.Core.Test.Download.CompletedDownloadServiceTests
             Mocker.GetMock<IParsingService>()
                   .Setup(s => s.GetMovie("Drone.S01E01.HDTV"))
                   .Returns(remoteMovie.Movie);
+
+            Mocker.GetMock<IConfigService>()
+                  .SetupGet(s => s.AllowAutomaticImport)
+                  .Returns(true);
         }
 
         private RemoteMovie BuildRemoteMovie()
