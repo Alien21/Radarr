@@ -262,18 +262,13 @@ namespace NzbDrone.Core.Download
 
                 _logger.Debug($"Autocreate movie '{movie.Title}' tmdbid: {movie.TmdbId}");
 
-                var tag = _tagService.All().Where(t => t.Label.EqualsIgnoreCase("autocreated")).ToList().FirstOrDefault();
-                if (tag == null)
+                movie.Monitored = true;
+
+                foreach (var tag in GetOrCreateAutoImportTags())
                 {
-                    tag = new Tag()
-                    {
-                        Label = "autocreated"
-                    };
-                    tag = _tagService.Add(tag);
+                    movie.Tags.Add(tag.Id);
                 }
 
-                movie.Monitored = true;
-                movie.Tags.Add(tag.Id);
                 movie.QualityProfile = profile;
                 movie.QualityProfileId = profile.Id;
                 movie.MinimumAvailability = MovieStatusType.Announced;
@@ -480,6 +475,28 @@ namespace NzbDrone.Core.Download
         private void SetImportItem(TrackedDownload trackedDownload)
         {
             trackedDownload.ImportItem = _provideImportItemService.ProvideImportItem(trackedDownload.DownloadItem, trackedDownload.ImportItem);
+        }
+
+        private List<Tag> GetOrCreateAutoImportTags()
+        {
+            var tags = _tagService.All();
+
+            return new[] { "autocreated", "default" }
+                .Select(label =>
+                {
+                    var tag = tags.FirstOrDefault(t => t.Label.EqualsIgnoreCase(label));
+
+                    if (tag != null)
+                    {
+                        return tag;
+                    }
+
+                    tag = _tagService.Add(new Tag { Label = label });
+                    tags.Add(tag);
+
+                    return tag;
+                })
+                .ToList();
         }
 
         private void AttachExistingMovie(TrackedDownload trackedDownload, Movie movie)
