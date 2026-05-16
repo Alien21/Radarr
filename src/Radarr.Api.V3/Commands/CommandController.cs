@@ -23,6 +23,7 @@ namespace Radarr.Api.V3.Commands
     public class CommandController : RestControllerWithSignalR<CommandResource, CommandModel>, IHandle<CommandUpdatedEvent>
     {
         private readonly IManageCommandQueue _commandQueueManager;
+        private readonly IManualImportService _manualImportService;
         private readonly KnownTypes _knownTypes;
         private readonly Debouncer _debouncer;
         private readonly Dictionary<int, CommandResource> _pendingUpdates;
@@ -30,11 +31,13 @@ namespace Radarr.Api.V3.Commands
         private readonly CommandPriorityComparer _commandPriorityComparer = new CommandPriorityComparer();
 
         public CommandController(IManageCommandQueue commandQueueManager,
-                             IBroadcastSignalRMessage signalRBroadcaster,
-                             KnownTypes knownTypes)
+                              IBroadcastSignalRMessage signalRBroadcaster,
+                              IManualImportService manualImportService,
+                              KnownTypes knownTypes)
             : base(signalRBroadcaster)
         {
             _commandQueueManager = commandQueueManager;
+            _manualImportService = manualImportService;
             _knownTypes = knownTypes;
 
             _debouncer = new Debouncer(SendUpdates, TimeSpan.FromSeconds(0.1));
@@ -73,6 +76,11 @@ namespace Radarr.Api.V3.Commands
                 command.ClientUserAgent = Request.Headers["UserAgent"];
 
                 var trackedCommand = _commandQueueManager.Push(command, priority, CommandTrigger.Manual);
+
+                if (command is ManualImportCommand manualImportCommand)
+                {
+                    _manualImportService.UpdateTrackedDownloadsForQueuedManualImport(manualImportCommand);
+                }
 
                 return Created(trackedCommand.Id);
             }

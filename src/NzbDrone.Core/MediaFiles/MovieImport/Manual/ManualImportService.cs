@@ -26,6 +26,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
         List<ManualImportItem> GetMediaFiles(int movieId);
         List<ManualImportItem> GetMediaFiles(string path, string downloadId, int? movieId, bool filterExistingFiles);
         ManualImportItem ReprocessItem(string path, string downloadId, int movieId, string releaseGroup, QualityModel quality, List<Language> languages, int indexerFlags);
+        void UpdateTrackedDownloadsForQueuedManualImport(ManualImportCommand message);
     }
 
     public class ManualImportService : IExecute<ManualImportCommand>, IManualImportService
@@ -512,19 +513,77 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             }
         }
 
+        public void UpdateTrackedDownloadsForQueuedManualImport(ManualImportCommand message)
+        {
+            if (message.Files == null)
+            {
+                return;
+            }
+
+            var updated = false;
+
+            foreach (var filesByDownload in message.Files.Where(f => f.DownloadId.IsNotNullOrWhiteSpace()).GroupBy(f => f.DownloadId))
+            {
+                var trackedDownload = _trackedDownloadService.Find(filesByDownload.Key);
+                var firstFile = filesByDownload.FirstOrDefault(f => f.MovieId > 0);
+
+                if (trackedDownload == null || firstFile == null)
+                {
+                    continue;
+                }
+
+                var movie = _movieService.GetMovie(firstFile.MovieId);
+                var parsedMovieInfo = Parser.Parser.ParseMoviePath(firstFile.Path,
+                                                                    _configService.ParseTmdbIdFromReleaseName) ?? new ParsedMovieInfo();
+
+                UpdateTrackedDownloadForManualImport(trackedDownload,
+                                                     movie,
+                                                     parsedMovieInfo,
+                                                     firstFile.Languages,
+                                                     TrackedDownloadState.ImportPending);
+                updated = true;
+            }
+
+            if (updated)
+            {
+                _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(_trackedDownloadService.GetTrackedDownloads()));
+            }
+        }
+
         private void UpdateTrackedDownloadForManualImport(TrackedDownload trackedDownload, LocalMovie localMovie)
         {
-            trackedDownload.RemoteMovie ??= new RemoteMovie();
-            trackedDownload.RemoteMovie.Movie = localMovie.Movie;
-            trackedDownload.RemoteMovie.ParsedMovieInfo ??= localMovie.FileMovieInfo;
-            trackedDownload.RemoteMovie.Languages = localMovie.Languages;
-            trackedDownload.RemoteMovie.CustomFormats = localMovie.CustomFormats;
-            trackedDownload.RemoteMovie.CustomFormatScore = localMovie.CustomFormatScore;
-
-            trackedDownload.ClearStatus();
-            trackedDownload.State = TrackedDownloadState.Importing;
+            UpdateTrackedDownloadForManualImport(trackedDownload,
+                                                 localMovie.Movie,
+                                                 localMovie.FileMovieInfo,
+                                                 localMovie.Languages,
+                                                 TrackedDownloadState.Importing,
+                                                 localMovie.CustomFormats,
+                                                 localMovie.CustomFormatScore);
 
             _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(_trackedDownloadService.GetTrackedDownloads()));
+        }
+
+        private void UpdateTrackedDownloadForManualImport(TrackedDownload trackedDownload,
+                                                          Movie movie,
+                                                          ParsedMovieInfo parsedMovieInfo,
+                                                          List<Language> languages,
+                                                          TrackedDownloadState state,
+                                                          List<CustomFormat> customFormats = null,
+                                                          int? customFormatScore = null)
+        {
+            trackedDownload.RemoteMovie ??= new RemoteMovie();
+            trackedDownload.RemoteMovie.Movie = movie;
+            trackedDownload.RemoteMovie.ParsedMovieInfo ??= parsedMovieInfo;
+            trackedDownload.RemoteMovie.Languages = languages;
+
+            if (customFormats != null)
+            {
+                trackedDownload.RemoteMovie.CustomFormats = customFormats;
+                trackedDownload.RemoteMovie.CustomFormatScore = customFormatScore ?? 0;
+            }
+
+            trackedDownload.ClearStatus();
+            trackedDownload.State = state;
         }
     }
 }
