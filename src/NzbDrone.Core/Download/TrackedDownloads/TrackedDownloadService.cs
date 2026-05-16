@@ -109,6 +109,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                 existingItem.DownloadItem = downloadItem;
                 existingItem.IsTrackable = true;
 
+                UpdateCachedCompletedDownloadState(existingItem);
+
                 return existingItem;
             }
 
@@ -233,6 +235,54 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             trackedDownload.RemoteMovie = parsedMovieInfo == null ? null : _parsingService.Map(parsedMovieInfo, "", 0, null);
 
             _aggregationService.Augment(trackedDownload.RemoteMovie);
+        }
+
+        private void UpdateCachedCompletedDownloadState(TrackedDownload trackedDownload)
+        {
+            if (trackedDownload.DownloadItem.Status != DownloadItemStatus.Completed)
+            {
+                return;
+            }
+
+            var downloadHistory = _downloadHistoryService.GetLatestDownloadHistoryItem(trackedDownload.DownloadItem.DownloadId);
+
+            if (downloadHistory == null)
+            {
+                return;
+            }
+
+            var historyItems = _historyService.FindByDownloadId(trackedDownload.DownloadItem.DownloadId)
+                .OrderByDescending(h => h.Date)
+                .ToList();
+
+            var state = GetStateFromHistory(downloadHistory.EventType, trackedDownload, historyItems);
+
+            if (!IsTerminalState(state))
+            {
+                return;
+            }
+
+            if (trackedDownload.State != state)
+            {
+                _logger.Debug("Updating cached completed download '{0}' from {1} to {2} based on download history.",
+                    trackedDownload.DownloadItem.Title,
+                    trackedDownload.State,
+                    state);
+            }
+
+            trackedDownload.State = state;
+
+            if (state == TrackedDownloadState.Imported)
+            {
+                trackedDownload.ClearStatus();
+            }
+        }
+
+        private static bool IsTerminalState(TrackedDownloadState state)
+        {
+            return state == TrackedDownloadState.Imported ||
+                   state == TrackedDownloadState.Failed ||
+                   state == TrackedDownloadState.Ignored;
         }
 
         private TrackedDownloadState GetStateFromHistory(DownloadHistoryEventType eventType, TrackedDownload trackedDownload, List<MovieHistory> historyItems)

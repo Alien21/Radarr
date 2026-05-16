@@ -198,6 +198,67 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
         }
 
         [Test]
+        public void should_update_cached_completed_usenet_download_to_imported_from_history()
+        {
+            var remoteMovie = new RemoteMovie
+            {
+                Movie = new Movie { Id = 3 },
+                ParsedMovieInfo = new ParsedMovieInfo
+                {
+                    MovieTitles = new List<string> { "A Movie" },
+                    Year = 1998
+                }
+            };
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId("35238"))
+                  .Returns(new List<MovieHistory>());
+
+            Mocker.GetMock<IParsingService>()
+                  .Setup(s => s.Map(It.IsAny<ParsedMovieInfo>(), It.IsAny<string>(), It.IsAny<int>(), null))
+                  .Returns(remoteMovie);
+
+            var client = new DownloadClientDefinition
+            {
+                Id = 1,
+                Protocol = DownloadProtocol.Usenet
+            };
+
+            var item = new DownloadClientItem
+            {
+                Title = "A.Movie.1998.720p.HDTV",
+                DownloadId = "35238",
+                Status = DownloadItemStatus.Completed,
+                DownloadClientInfo = new DownloadClientItemClientInfo
+                {
+                    Protocol = client.Protocol,
+                    Id = client.Id,
+                    Name = client.Name
+                }
+            };
+
+            var trackedDownload = Subject.TrackDownload(client, item);
+
+            trackedDownload.State = TrackedDownloadState.ImportBlocked;
+            trackedDownload.Warn("Unable to import automatically");
+
+            Mocker.GetMock<IDownloadHistoryService>()
+                  .Setup(s => s.GetLatestDownloadHistoryItem("35238"))
+                  .Returns(new DownloadHistory
+                  {
+                      DownloadId = "35238",
+                      EventType = DownloadHistoryEventType.DownloadImported
+                  });
+
+            var updatedTrackedDownload = Subject.TrackDownload(client, item);
+
+            updatedTrackedDownload.Should().BeSameAs(trackedDownload);
+            updatedTrackedDownload.State.Should().Be(TrackedDownloadState.Imported);
+            updatedTrackedDownload.Status.Should().Be(TrackedDownloadStatus.Ok);
+            updatedTrackedDownload.StatusMessages.Should().BeEmpty();
+        }
+
+        [Test]
         public void should_mark_download_as_imported_when_imported_history_matches_current_file()
         {
             var historyItems = new List<MovieHistory>();
