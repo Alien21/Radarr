@@ -51,6 +51,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
                 return ImportSpecDecision.Accept();
             }
 
+            if (!ImportedFileSizeMatches(localMovie, lastImported))
+            {
+                _logger.Debug("Movie file was previously imported, but the current file size does not match the imported size");
+                return ImportSpecDecision.Accept();
+            }
+
             if (lastGrabbed != null)
             {
                 // If the release was grabbed again after importing don't reject it
@@ -74,6 +80,20 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
             }
 
             return ImportSpecDecision.Accept();
+        }
+
+        private static bool ImportedFileSizeMatches(LocalMovie localMovie, MovieHistory lastImported)
+        {
+            if (localMovie.Size <= 0 ||
+                lastImported.Data == null ||
+                !lastImported.Data.TryGetValue("Size", out var importedSizeText) ||
+                !long.TryParse(importedSizeText, out var importedSize) ||
+                importedSize <= 0)
+            {
+                return true;
+            }
+
+            return localMovie.Size == importedSize;
         }
     }
 }

@@ -4,6 +4,7 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.Download;
+using NzbDrone.Core.Download.History;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.History;
 using NzbDrone.Core.Indexers;
@@ -84,6 +85,173 @@ namespace NzbDrone.Core.Test.Download.TrackedDownloads
             trackedDownload.RemoteMovie.Should().NotBeNull();
             trackedDownload.RemoteMovie.Movie.Should().NotBeNull();
             trackedDownload.RemoteMovie.Movie.Id.Should().Be(3);
+        }
+
+        [Test]
+        public void should_not_mark_download_as_imported_when_imported_history_does_not_match_current_file()
+        {
+            var remoteMovie = new RemoteMovie
+            {
+                Movie = new Movie { Id = 3 },
+                ParsedMovieInfo = new ParsedMovieInfo
+                {
+                    MovieTitles = new List<string> { "A Movie" },
+                    Year = 1998
+                }
+            };
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId("35238"))
+                  .Returns(new List<MovieHistory>());
+
+            Mocker.GetMock<IDownloadHistoryService>()
+                  .Setup(s => s.GetLatestDownloadHistoryItem("35238"))
+                  .Returns(new DownloadHistory
+                  {
+                      DownloadId = "35238",
+                      EventType = DownloadHistoryEventType.DownloadImported
+                  });
+
+            Mocker.GetMock<IParsingService>()
+                  .Setup(s => s.Map(It.IsAny<ParsedMovieInfo>(), It.IsAny<string>(), It.IsAny<int>(), null))
+                  .Returns(remoteMovie);
+
+            Mocker.GetMock<ITrackedDownloadAlreadyImported>()
+                  .Setup(s => s.IsImported(It.IsAny<TrackedDownload>(), It.IsAny<List<MovieHistory>>()))
+                  .Returns(false);
+
+            var client = new DownloadClientDefinition
+            {
+                Id = 1,
+                Protocol = DownloadProtocol.Torrent
+            };
+
+            var item = new DownloadClientItem
+            {
+                Title = "A.Movie.1998.720p.HDTV",
+                DownloadId = "35238",
+                DownloadClientInfo = new DownloadClientItemClientInfo
+                {
+                    Protocol = client.Protocol,
+                    Id = client.Id,
+                    Name = client.Name
+                }
+            };
+
+            var trackedDownload = Subject.TrackDownload(client, item);
+
+            trackedDownload.State.Should().Be(TrackedDownloadState.Downloading);
+        }
+
+        [Test]
+        public void should_keep_imported_usenet_history_imported_without_file_revalidation()
+        {
+            var remoteMovie = new RemoteMovie
+            {
+                Movie = new Movie { Id = 3 },
+                ParsedMovieInfo = new ParsedMovieInfo
+                {
+                    MovieTitles = new List<string> { "A Movie" },
+                    Year = 1998
+                }
+            };
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId("35238"))
+                  .Returns(new List<MovieHistory>());
+
+            Mocker.GetMock<IDownloadHistoryService>()
+                  .Setup(s => s.GetLatestDownloadHistoryItem("35238"))
+                  .Returns(new DownloadHistory
+                  {
+                      DownloadId = "35238",
+                      EventType = DownloadHistoryEventType.DownloadImported
+                  });
+
+            Mocker.GetMock<IParsingService>()
+                  .Setup(s => s.Map(It.IsAny<ParsedMovieInfo>(), It.IsAny<string>(), It.IsAny<int>(), null))
+                  .Returns(remoteMovie);
+
+            var client = new DownloadClientDefinition
+            {
+                Id = 1,
+                Protocol = DownloadProtocol.Usenet
+            };
+
+            var item = new DownloadClientItem
+            {
+                Title = "A.Movie.1998.720p.HDTV",
+                DownloadId = "35238",
+                DownloadClientInfo = new DownloadClientItemClientInfo
+                {
+                    Protocol = client.Protocol,
+                    Id = client.Id,
+                    Name = client.Name
+                }
+            };
+
+            var trackedDownload = Subject.TrackDownload(client, item);
+
+            trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
+            Mocker.GetMock<ITrackedDownloadAlreadyImported>()
+                  .Verify(s => s.IsImported(It.IsAny<TrackedDownload>(), It.IsAny<List<MovieHistory>>()), Times.Never());
+        }
+
+        [Test]
+        public void should_mark_download_as_imported_when_imported_history_matches_current_file()
+        {
+            var historyItems = new List<MovieHistory>();
+            var remoteMovie = new RemoteMovie
+            {
+                Movie = new Movie { Id = 3 },
+                ParsedMovieInfo = new ParsedMovieInfo
+                {
+                    MovieTitles = new List<string> { "A Movie" },
+                    Year = 1998
+                }
+            };
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId("35238"))
+                  .Returns(historyItems);
+
+            Mocker.GetMock<IDownloadHistoryService>()
+                  .Setup(s => s.GetLatestDownloadHistoryItem("35238"))
+                  .Returns(new DownloadHistory
+                  {
+                      DownloadId = "35238",
+                      EventType = DownloadHistoryEventType.DownloadImported
+                  });
+
+            Mocker.GetMock<IParsingService>()
+                  .Setup(s => s.Map(It.IsAny<ParsedMovieInfo>(), It.IsAny<string>(), It.IsAny<int>(), null))
+                  .Returns(remoteMovie);
+
+            Mocker.GetMock<ITrackedDownloadAlreadyImported>()
+                  .Setup(s => s.IsImported(It.IsAny<TrackedDownload>(), historyItems))
+                  .Returns(true);
+
+            var client = new DownloadClientDefinition
+            {
+                Id = 1,
+                Protocol = DownloadProtocol.Torrent
+            };
+
+            var item = new DownloadClientItem
+            {
+                Title = "A.Movie.1998.720p.HDTV",
+                DownloadId = "35238",
+                DownloadClientInfo = new DownloadClientItemClientInfo
+                {
+                    Protocol = client.Protocol,
+                    Id = client.Id,
+                    Name = client.Name
+                }
+            };
+
+            var trackedDownload = Subject.TrackDownload(client, item);
+
+            trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
         }
 
         [Test]

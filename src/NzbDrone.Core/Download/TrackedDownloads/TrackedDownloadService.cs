@@ -9,6 +9,7 @@ using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download.Aggregation;
 using NzbDrone.Core.Download.History;
 using NzbDrone.Core.History;
+using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Events;
@@ -37,6 +38,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         private readonly IHistoryService _historyService;
         private readonly IEventAggregator _eventAggregator;
         private readonly IDownloadHistoryService _downloadHistoryService;
+        private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
         private readonly IConfigService _config;
         private readonly IRemoteMovieAggregationService _aggregationService;
         private readonly ICustomFormatCalculationService _formatCalculator;
@@ -51,6 +53,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                                       ICustomFormatCalculationService formatCalculator,
                                       IEventAggregator eventAggregator,
                                       IDownloadHistoryService downloadHistoryService,
+                                      ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
                                       Logger logger)
         {
             _parsingService = parsingService;
@@ -61,6 +64,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _formatCalculator = formatCalculator;
             _eventAggregator = eventAggregator;
             _downloadHistoryService = downloadHistoryService;
+            _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
             _logger = logger;
         }
 
@@ -96,7 +100,9 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         {
             var existingItem = Find(downloadItem.DownloadId);
 
-            if (existingItem != null && existingItem.State != TrackedDownloadState.Downloading)
+            if (existingItem != null &&
+                existingItem.State != TrackedDownloadState.Downloading &&
+                existingItem.State != TrackedDownloadState.Imported)
             {
                 LogItemChange(existingItem, existingItem.DownloadItem, downloadItem);
 
@@ -121,19 +127,13 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                     .OrderByDescending(h => h.Date)
                     .ToList();
 
+                var downloadHistory = _downloadHistoryService.GetLatestDownloadHistoryItem(downloadItem.DownloadId);
+
                 var parsedMovieInfo = Parser.Parser.ParseMovieTitle(trackedDownload.DownloadItem.Title, false, _config.ParseTmdbIdFromReleaseName);
 
                 if (parsedMovieInfo != null)
                 {
                     trackedDownload.RemoteMovie = _parsingService.Map(parsedMovieInfo, "", 0, null);
-                }
-
-                var downloadHistory = _downloadHistoryService.GetLatestDownloadHistoryItem(downloadItem.DownloadId);
-
-                if (downloadHistory != null)
-                {
-                    var state = GetStateFromHistory(downloadHistory.EventType);
-                    trackedDownload.State = state;
                 }
 
                 if (historyItems.Any())
@@ -180,6 +180,11 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
                     // Calculate custom formats
                     trackedDownload.RemoteMovie.CustomFormats = _formatCalculator.ParseCustomFormat(trackedDownload.RemoteMovie, downloadItem.TotalSize);
+                }
+
+                if (downloadHistory != null)
+                {
+                    trackedDownload.State = GetStateFromHistory(downloadHistory.EventType, trackedDownload, historyItems);
                 }
 
                 // Track it so it can be displayed in the queue even though we can't determine which movie it is for
@@ -230,12 +235,12 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _aggregationService.Augment(trackedDownload.RemoteMovie);
         }
 
-        private static TrackedDownloadState GetStateFromHistory(DownloadHistoryEventType eventType)
+        private TrackedDownloadState GetStateFromHistory(DownloadHistoryEventType eventType, TrackedDownload trackedDownload, List<MovieHistory> historyItems)
         {
             switch (eventType)
             {
                 case DownloadHistoryEventType.DownloadImported:
-                    return TrackedDownloadState.Imported;
+                    return GetImportedStateFromHistory(trackedDownload, historyItems);
                 case DownloadHistoryEventType.DownloadFailed:
                     return TrackedDownloadState.Failed;
                 case DownloadHistoryEventType.DownloadIgnored:
@@ -243,6 +248,28 @@ namespace NzbDrone.Core.Download.TrackedDownloads
                 default:
                     return TrackedDownloadState.Downloading;
             }
+        }
+
+        private TrackedDownloadState GetImportedStateFromHistory(TrackedDownload trackedDownload, List<MovieHistory> historyItems)
+        {
+            if (trackedDownload.Protocol != DownloadProtocol.Torrent)
+            {
+                return TrackedDownloadState.Imported;
+            }
+
+            if (trackedDownload.RemoteMovie?.Movie == null)
+            {
+                _logger.Debug("Ignoring imported download history for '{0}' because it does not map to a movie.", trackedDownload.DownloadItem.Title);
+                return TrackedDownloadState.Downloading;
+            }
+
+            if (_trackedDownloadAlreadyImported.IsImported(trackedDownload, historyItems))
+            {
+                return TrackedDownloadState.Imported;
+            }
+
+            _logger.Debug("Ignoring imported download history for '{0}' because the current movie file does not match this download.", trackedDownload.DownloadItem.Title);
+            return TrackedDownloadState.Downloading;
         }
 
         private void LogItemChange(TrackedDownload trackedDownload, DownloadClientItem existingItem, DownloadClientItem downloadItem)

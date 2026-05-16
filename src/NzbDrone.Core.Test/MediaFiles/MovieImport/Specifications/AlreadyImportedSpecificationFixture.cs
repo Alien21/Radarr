@@ -117,5 +117,31 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Specifications
 
             Subject.IsSatisfiedBy(_localMovie, _downloadClientItem).Accepted.Should().BeFalse();
         }
+
+        [Test]
+        public void should_accept_if_movie_imported_after_being_grabbed_but_current_file_size_differs()
+        {
+            _movie.MovieFileId = 1;
+            _localMovie.Size = 200;
+
+            var history = Builder<MovieHistory>.CreateListOfSize(2)
+                .All()
+                .With(h => h.MovieId = _movie.Id)
+                .With(h => h.DownloadId = _downloadClientItem.DownloadId)
+                .TheFirst(1)
+                .With(h => h.EventType = MovieHistoryEventType.DownloadFolderImported)
+                .With(h => h.Date = DateTime.UtcNow.AddDays(-1))
+                .TheNext(1)
+                .With(h => h.EventType = MovieHistoryEventType.Grabbed)
+                .With(h => h.Date = DateTime.UtcNow.AddDays(-2))
+                .Build()
+                .ToList();
+
+            history[0].Data["Size"] = "100";
+
+            GivenHistory(history);
+
+            Subject.IsSatisfiedBy(_localMovie, _downloadClientItem).Accepted.Should().BeTrue();
+        }
     }
 }

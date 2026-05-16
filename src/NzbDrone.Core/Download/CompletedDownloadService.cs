@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -517,6 +518,11 @@ namespace NzbDrone.Core.Download
 
             EnsureRemoteMovie(trackedDownload, movie);
 
+            if (MarkAsImportedIfAlreadyImportedInHistory(trackedDownload))
+            {
+                return true;
+            }
+
             AnalyzeCompletedDownloadFile(trackedDownload);
 
             if (ShouldBypassExistingMovieAutoImportBlock(trackedDownload, movie))
@@ -528,6 +534,93 @@ namespace NzbDrone.Core.Download
             _logger.Warn("Auto-import blocked: '{0}' tmdbid: {1} already has a movie file in library.", movie.Title, movie.TmdbId);
             SetStateToImportBlocked(trackedDownload);
             return true;
+        }
+
+        private bool MarkAsImportedIfAlreadyImportedInHistory(TrackedDownload trackedDownload)
+        {
+            var historyItems = _historyService.FindByDownloadId(trackedDownload.DownloadItem.DownloadId)
+                .OrderByDescending(h => h.Date)
+                .ToList();
+
+            if (!_trackedDownloadAlreadyImported.IsImported(trackedDownload, historyItems) ||
+                !RemainingDownloadFilesMatchImportHistory(trackedDownload, historyItems))
+            {
+                return false;
+            }
+
+            _logger.Debug("All movies were imported in history for {0}", trackedDownload.DownloadItem.Title);
+
+            trackedDownload.State = TrackedDownloadState.Imported;
+            _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, trackedDownload.RemoteMovie.Movie.Id));
+
+            return true;
+        }
+
+        private bool RemainingDownloadFilesMatchImportHistory(TrackedDownload trackedDownload, List<MovieHistory> historyItems)
+        {
+            var outputPath = trackedDownload.ImportItem?.OutputPath.FullPath;
+
+            if (outputPath.IsNullOrWhiteSpace() ||
+                !TryGetCompletedDownloadVideoFiles(outputPath, out var videoFiles) ||
+                videoFiles.Empty())
+            {
+                return true;
+            }
+
+            foreach (var videoFile in videoFiles)
+            {
+                var importHistory = historyItems.FirstOrDefault(history =>
+                    history.EventType == MovieHistoryEventType.DownloadFolderImported &&
+                    history.Data?.TryGetValue("DroppedPath", out var droppedPath) == true &&
+                    droppedPath.Equals(videoFile, StringComparison.OrdinalIgnoreCase));
+
+                if (importHistory == null)
+                {
+                    _logger.Trace("Remaining download file '{0}' does not match any imported file history.", videoFile);
+                    return false;
+                }
+
+                if (!importHistory.Data.TryGetValue("Size", out var importedSizeText) ||
+                    !long.TryParse(importedSizeText, out var importedSize) ||
+                    importedSize <= 0)
+                {
+                    _logger.Trace("Remaining download file '{0}' does not have an imported file size recorded.", videoFile);
+                    return false;
+                }
+
+                var currentSize = _diskProvider.GetFileSize(videoFile);
+
+                if (currentSize != importedSize)
+                {
+                    _logger.Trace("Remaining download file '{0}' size {1} does not match imported size {2}.", videoFile, currentSize, importedSize);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool TryGetCompletedDownloadVideoFiles(string outputPath, out List<string> videoFiles)
+        {
+            if (_diskProvider.FolderExists(outputPath))
+            {
+                var directoryInfo = new DirectoryInfo(outputPath);
+                videoFiles = _diskScanService.FilterPaths(directoryInfo.FullName, _diskScanService.GetVideoFiles(directoryInfo.FullName))
+                                            .OrderBy(path => path)
+                                            .ToList();
+
+                return true;
+            }
+
+            if (_diskProvider.FileExists(outputPath) &&
+                MediaFileExtensions.Extensions.Contains(Path.GetExtension(outputPath)))
+            {
+                videoFiles = new List<string> { outputPath };
+                return true;
+            }
+
+            videoFiles = new List<string>();
+            return false;
         }
 
         private bool ShouldBypassExistingMovieAutoImportBlock(TrackedDownload trackedDownload, Movie movie)

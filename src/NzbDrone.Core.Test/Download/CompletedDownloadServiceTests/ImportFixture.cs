@@ -221,6 +221,127 @@ namespace NzbDrone.Core.Test.Download
         }
 
         [Test]
+        public void should_mark_as_imported_if_existing_movie_block_finds_movie_imported_in_history()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.BlockAutoImportForExistingMovieFiles)
+                .Returns(true);
+
+            var outputFolder = @"C:\DropFolder\MyDownload".AsOsAgnostic();
+            var sourcePath = @"C:\DropFolder\MyDownload\Droned.1998.mkv".AsOsAgnostic();
+            var fileSize = 1234L;
+            var movie = _trackedDownload.RemoteMovie.Movie;
+            movie.MovieFileId = 10;
+
+            _trackedDownload.DownloadItem.OutputPath = new OsPath(outputFolder);
+
+            var history = Builder<MovieHistory>.CreateListOfSize(1)
+                                               .All()
+                                               .With(h => h.MovieId = movie.Id)
+                                               .With(h => h.EventType = MovieHistoryEventType.DownloadFolderImported)
+                                               .BuildList();
+
+            history[0].Data["FileId"] = movie.MovieFileId.ToString();
+            history[0].Data["DroppedPath"] = sourcePath;
+            history[0].Data["Size"] = fileSize.ToString();
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId(It.IsAny<string>()))
+                  .Returns(history);
+
+            Mocker.GetMock<ITrackedDownloadAlreadyImported>()
+                  .Setup(s => s.IsImported(_trackedDownload, It.IsAny<List<MovieHistory>>()))
+                  .Returns(true);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(outputFolder))
+                  .Returns(true);
+
+            Mocker.GetMock<IDiskScanService>()
+                  .Setup(s => s.GetVideoFiles(outputFolder, It.IsAny<bool>()))
+                  .Returns(new[] { sourcePath });
+
+            Mocker.GetMock<IDiskScanService>()
+                  .Setup(s => s.FilterPaths(outputFolder, It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()))
+                  .Returns(new List<string> { sourcePath });
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.GetFileSize(sourcePath))
+                  .Returns(fileSize);
+
+            Subject.Import(_trackedDownload);
+
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                  .Verify(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()), Times.Never());
+
+            Mocker.GetMock<IEventAggregator>()
+                  .Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Once());
+
+            _trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
+        }
+
+        [Test]
+        public void should_not_mark_as_imported_from_history_if_remaining_file_size_differs()
+        {
+            Mocker.GetMock<IConfigService>()
+                .SetupGet(v => v.BlockAutoImportForExistingMovieFiles)
+                .Returns(true);
+
+            var outputFolder = @"C:\DropFolder\MyDownload".AsOsAgnostic();
+            var sourcePath = @"C:\DropFolder\MyDownload\Droned.1998.mkv".AsOsAgnostic();
+            var importedSize = 1234L;
+            var movie = _trackedDownload.RemoteMovie.Movie;
+            movie.MovieFileId = 10;
+
+            _trackedDownload.DownloadItem.OutputPath = new OsPath(outputFolder);
+
+            var history = Builder<MovieHistory>.CreateListOfSize(1)
+                                               .All()
+                                               .With(h => h.MovieId = movie.Id)
+                                               .With(h => h.EventType = MovieHistoryEventType.DownloadFolderImported)
+                                               .BuildList();
+
+            history[0].Data["DroppedPath"] = sourcePath;
+            history[0].Data["Size"] = importedSize.ToString();
+
+            Mocker.GetMock<IHistoryService>()
+                  .Setup(s => s.FindByDownloadId(It.IsAny<string>()))
+                  .Returns(history);
+
+            Mocker.GetMock<ITrackedDownloadAlreadyImported>()
+                  .Setup(s => s.IsImported(_trackedDownload, It.IsAny<List<MovieHistory>>()))
+                  .Returns(true);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(outputFolder))
+                  .Returns(true);
+
+            Mocker.GetMock<IDiskScanService>()
+                  .Setup(s => s.GetVideoFiles(outputFolder, It.IsAny<bool>()))
+                  .Returns(new[] { sourcePath });
+
+            Mocker.GetMock<IDiskScanService>()
+                  .Setup(s => s.FilterPaths(outputFolder, It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()))
+                  .Returns(new List<string> { sourcePath });
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.GetFileSize(sourcePath))
+                  .Returns(importedSize + 1);
+
+            Mocker.GetMock<IMakeImportDecision>()
+                  .Setup(s => s.GetImportDecisions(It.IsAny<List<string>>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>(), It.IsAny<ParsedMovieInfo>(), true))
+                  .Returns(new List<ImportDecision>());
+
+            Subject.Import(_trackedDownload);
+
+            Mocker.GetMock<IEventAggregator>()
+                  .Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Never());
+
+            AssertNotImported();
+            ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
         public void should_bypass_existing_movie_auto_import_block_for_preferred_dual_audio_upgrade()
         {
             Mocker.GetMock<IConfigService>()
