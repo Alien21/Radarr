@@ -374,6 +374,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             item.ReleaseGroup = decision.LocalMovie.ReleaseGroup;
             item.Rejections = decision.Rejections;
             item.IndexerFlags = (int)decision.LocalMovie.IndexerFlags;
+            item.ExistingMovieFile = GetExistingMovieFile(decision.LocalMovie);
 
             if (decision.LocalMovie.Movie != null)
             {
@@ -384,6 +385,25 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
             }
 
             return item;
+        }
+
+        private ManualImportExistingMovieFile GetExistingMovieFile(LocalMovie localMovie)
+        {
+            if (localMovie?.Movie?.MovieFileId <= 0 || localMovie.Movie.MovieFile == null)
+            {
+                return null;
+            }
+
+            var movieFile = localMovie.Movie.MovieFile;
+
+            return new ManualImportExistingMovieFile
+            {
+                Id = movieFile.Id,
+                RelativePath = movieFile.RelativePath,
+                Size = movieFile.Size,
+                Quality = movieFile.Quality,
+                Languages = movieFile.Languages
+            };
         }
 
         private ManualImportItem MapItem(MovieFile movieFile, Movie movie, string folderName)

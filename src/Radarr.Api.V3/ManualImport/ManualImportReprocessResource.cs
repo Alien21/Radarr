@@ -12,6 +12,7 @@ namespace Radarr.Api.V3.ManualImport
         public string Path { get; set; }
         public int MovieId { get; set; }
         public MovieResource Movie { get; set; }
+        public ManualImportExistingMovieFileResource ExistingMovieFile { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }
         public string ReleaseGroup { get; set; }

@@ -2,6 +2,9 @@
 // Please do not change this file!
 interface CssExports {
   'customFormatTooltip': string;
+  'existingFileLabel': string;
+  'existingFileRelativePath': string;
+  'existingFileValue': string;
   'label': string;
   'languages': string;
   'quality': string;

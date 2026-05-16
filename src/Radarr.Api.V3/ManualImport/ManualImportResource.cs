@@ -21,6 +21,7 @@ namespace Radarr.Api.V3.ManualImport
         public long Size { get; set; }
         public MovieResource Movie { get; set; }
         public int? MovieFileId { get; set; }
+        public ManualImportExistingMovieFileResource ExistingMovieFile { get; set; }
         public string ReleaseGroup { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }
@@ -54,6 +55,7 @@ namespace Radarr.Api.V3.ManualImport
                 Size = model.Size,
                 Movie = model.Movie.ToResource(0),
                 MovieFileId = model.MovieFileId,
+                ExistingMovieFile = model.ExistingMovieFile.ToResource(),
                 ReleaseGroup = model.ReleaseGroup,
                 Quality = model.Quality,
                 Languages = model.Languages,
@@ -70,6 +72,34 @@ namespace Radarr.Api.V3.ManualImport
         public static List<ManualImportResource> ToResource(this IEnumerable<ManualImportItem> models)
         {
             return models.Select(ToResource).ToList();
+        }
+    }
+
+    public class ManualImportExistingMovieFileResource : RestResource
+    {
+        public string RelativePath { get; set; }
+        public long Size { get; set; }
+        public QualityModel Quality { get; set; }
+        public List<Language> Languages { get; set; }
+    }
+
+    public static class ManualImportExistingMovieFileResourceMapper
+    {
+        public static ManualImportExistingMovieFileResource ToResource(this ManualImportExistingMovieFile model)
+        {
+            if (model == null)
+            {
+                return null;
+            }
+
+            return new ManualImportExistingMovieFileResource
+            {
+                Id = model.Id,
+                RelativePath = model.RelativePath,
+                Size = model.Size,
+                Quality = model.Quality,
+                Languages = model.Languages
+            };
         }
     }
 

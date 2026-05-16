@@ -11,6 +11,26 @@
   text-align: center;
 }
 
+.existingFileValue {
+  margin-top: 4px;
+  color: var(--helpTextColor);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.existingFileRelativePath {
+  composes: existingFileValue;
+
+  word-break: break-all;
+}
+
+.existingFileLabel {
+  composes: label from '~Components/Label.css';
+
+  font-size: 10px;
+  opacity: 0.85;
+}
+
 .label {
   composes: label from '~Components/Label.css';
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'Components/Icon';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRowCellButton from 'Components/Table/Cells/TableRowCellButton';
@@ -9,6 +9,7 @@ import TableRow from 'Components/Table/TableRow';
 import Popover from 'Components/Tooltip/Popover';
 import { icons, kinds, tooltipPositions } from 'Helpers/Props';
 import SelectIndexerFlagsModal from 'InteractiveImport/IndexerFlags/SelectIndexerFlagsModal';
+import { ExistingMovieFile } from 'InteractiveImport/InteractiveImport';
 import SelectLanguageModal from 'InteractiveImport/Language/SelectLanguageModal';
 import SelectMovieModal from 'InteractiveImport/Movie/SelectMovieModal';
 import SelectQualityModal from 'InteractiveImport/Quality/SelectQualityModal';
@@ -25,6 +26,7 @@ import {
   reprocessInteractiveImportItems,
   updateInteractiveImportItem,
 } from 'Store/Actions/interactiveImportActions';
+import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
 import CustomFormat from 'typings/CustomFormat';
 import { SelectStateInputProps } from 'typings/props';
 import Rejection from 'typings/Rejection';
@@ -45,11 +47,44 @@ type SelectedChangeProps = SelectStateInputProps & {
   hasMovieFileId: boolean;
 };
 
+function sortLanguagesByPreference(
+  languages: Language[] = [],
+  movieInfoLanguage: number
+) {
+  return languages
+    .map((language, index) => ({ language, index }))
+    .sort((a, b) => {
+      const priorityDiff =
+        getLanguagePriority(a.language, movieInfoLanguage) -
+        getLanguagePriority(b.language, movieInfoLanguage);
+
+      return priorityDiff || a.index - b.index;
+    })
+    .map((item) => item.language);
+}
+
+function getLanguagePriority(language: Language, movieInfoLanguage: number) {
+  if (language.id === movieInfoLanguage) {
+    return 0;
+  }
+
+  if (language.id === 1) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function getFileName(relativePath: string) {
+  return relativePath.split(/[\\/]/).pop() ?? relativePath;
+}
+
 interface InteractiveImportRowProps {
   id: number;
   allowMovieChange: boolean;
   relativePath: string;
   movie?: Movie;
+  existingMovieFile?: ExistingMovieFile;
   releaseGroup?: string;
   quality?: QualityModel;
   languages?: Language[];
@@ -73,6 +108,7 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
     allowMovieChange,
     relativePath,
     movie,
+    existingMovieFile,
     quality,
     languages,
     releaseGroup,
@@ -91,6 +127,7 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
 
   const dispatch = useDispatch();
   const movieFromStore = useMovie(movie?.id);
+  const { movieInfoLanguage } = useSelector(createUISettingsSelector());
 
   const isMovieColumnVisible = useMemo(
     () => columns.find((c) => c.name === 'movie')?.isVisible ?? false,
@@ -267,6 +304,24 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
   const showQualityPlaceholder = isSelected && !quality;
   const showLanguagePlaceholder = isSelected && !languages;
   const showIndexerFlagsPlaceholder = isSelected && !indexerFlags;
+  const sortedLanguages = useMemo(
+    () => sortLanguagesByPreference(languages, movieInfoLanguage),
+    [languages, movieInfoLanguage]
+  );
+  const existingFileDetails = useMemo(() => {
+    if (!existingMovieFile) {
+      return null;
+    }
+
+    return {
+      ...existingMovieFile,
+      fileName: getFileName(existingMovieFile.relativePath),
+      sortedLanguages: sortLanguagesByPreference(
+        existingMovieFile.languages,
+        movieInfoLanguage
+      ),
+    };
+  }, [existingMovieFile, movieInfoLanguage]);
 
   return (
     <TableRow>
@@ -278,6 +333,15 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
 
       <TableRowCell className={styles.relativePath} title={relativePath}>
         {relativePath}
+
+        {existingFileDetails ? (
+          <div
+            className={styles.existingFileRelativePath}
+            title={existingFileDetails.relativePath}
+          >
+            {existingFileDetails.fileName}
+          </div>
+        ) : null}
       </TableRowCell>
 
       {isMovieColumnVisible ? (
@@ -315,6 +379,15 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
         {!showQualityPlaceholder && !!quality && (
           <MovieQuality className={styles.label} quality={quality} />
         )}
+
+        {existingFileDetails ? (
+          <div className={styles.existingFileValue}>
+            <MovieQuality
+              className={styles.existingFileLabel}
+              quality={existingFileDetails.quality}
+            />
+          </div>
+        ) : null}
       </TableRowCellButton>
 
       <TableRowCellButton
@@ -325,11 +398,31 @@ function InteractiveImportRow(props: InteractiveImportRowProps) {
         {showLanguagePlaceholder && <InteractiveImportRowCellPlaceholder />}
 
         {!showLanguagePlaceholder && !!languages && (
-          <MovieLanguages className={styles.label} languages={languages} />
+          <MovieLanguages
+            className={styles.label}
+            languages={sortedLanguages}
+          />
         )}
+
+        {existingFileDetails ? (
+          <div className={styles.existingFileValue}>
+            <MovieLanguages
+              className={styles.existingFileLabel}
+              languages={existingFileDetails.sortedLanguages}
+            />
+          </div>
+        ) : null}
       </TableRowCellButton>
 
-      <TableRowCell>{formatBytes(size)}</TableRowCell>
+      <TableRowCell>
+        {formatBytes(size)}
+
+        {existingFileDetails ? (
+          <div className={styles.existingFileValue}>
+            {formatBytes(existingFileDetails.size)}
+          </div>
+        ) : null}
+      </TableRowCell>
 
       <TableRowCell>
         {customFormats?.length ? (

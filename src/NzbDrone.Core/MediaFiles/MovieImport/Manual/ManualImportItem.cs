@@ -15,6 +15,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
         public long Size { get; set; }
         public Movie Movie { get; set; }
         public int? MovieFileId { get; set; }
+        public ManualImportExistingMovieFile ExistingMovieFile { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }
         public string ReleaseGroup { get; set; }
@@ -28,5 +29,14 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
         {
             CustomFormats = new List<CustomFormat>();
         }
+    }
+
+    public class ManualImportExistingMovieFile
+    {
+        public int Id { get; set; }
+        public string RelativePath { get; set; }
+        public long Size { get; set; }
+        public QualityModel Quality { get; set; }
+        public List<Language> Languages { get; set; }
     }
 }

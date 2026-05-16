@@ -48,6 +48,7 @@ namespace Radarr.Api.V3.ManualImport
                 var processedItem = _manualImportService.ReprocessItem(item.Path, item.DownloadId, item.MovieId, item.ReleaseGroup, item.Quality, item.Languages, item.IndexerFlags);
 
                 item.Movie = processedItem.Movie.ToResource(0);
+                item.ExistingMovieFile = processedItem.ExistingMovieFile.ToResource();
                 item.IndexerFlags = processedItem.IndexerFlags;
                 item.Rejections = processedItem.Rejections.Select(r => r.ToResource());
                 item.CustomFormats = processedItem.CustomFormats.ToResource(false);

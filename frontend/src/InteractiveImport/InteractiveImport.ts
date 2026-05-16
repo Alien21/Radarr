@@ -1,9 +1,15 @@
 import ModelBase from 'App/ModelBase';
 import Language from 'Language/Language';
 import Movie from 'Movie/Movie';
+import { MovieFile } from 'MovieFile/MovieFile';
 import { QualityModel } from 'Quality/Quality';
 import CustomFormat from 'typings/CustomFormat';
 import Rejection from 'typings/Rejection';
+
+export type ExistingMovieFile = Pick<
+  MovieFile,
+  'id' | 'relativePath' | 'quality' | 'languages' | 'size'
+>;
 
 export interface InteractiveImportCommandOptions {
   path: string;
@@ -27,6 +33,7 @@ interface InteractiveImport extends ModelBase {
   quality: QualityModel;
   languages: Language[];
   movie?: Movie;
+  existingMovieFile?: ExistingMovieFile;
   qualityWeight: number;
   customFormats: CustomFormat[];
   indexerFlags: number;
