@@ -64,8 +64,15 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
                     downloadPropersAndRepacks != ProperDownloadTypes.DoNotPrefer &&
                     localMovie.Quality.Revision.CompareTo(movieFile.Quality.Revision) < 0)
                 {
-                    _logger.Debug("This file isn't a quality revision upgrade for movie. Skipping {0}", localMovie.Path);
-                    return ImportSpecDecision.Reject(ImportRejectionReason.NotRevisionUpgrade, "Not a quality revision upgrade for existing movie file(s)");
+                    if (dualAudioPreference.IsPreferredUpgrade)
+                    {
+                        _logger.Debug("This file isn't a quality revision upgrade for movie, but it is a preferred dual-audio upgrade. Continuing {0}", localMovie.Path);
+                    }
+                    else
+                    {
+                        _logger.Debug("This file isn't a quality revision upgrade for movie. Skipping {0}", localMovie.Path);
+                        return ImportSpecDecision.Reject(ImportRejectionReason.NotRevisionUpgrade, "Not a quality revision upgrade for existing movie file(s)");
+                    }
                 }
 
                 movieFile.Movie = localMovie.Movie;

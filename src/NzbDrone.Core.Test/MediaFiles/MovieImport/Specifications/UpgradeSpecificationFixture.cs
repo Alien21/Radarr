@@ -90,6 +90,32 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Specifications
         }
 
         [Test]
+        public void should_return_true_if_preferred_dual_audio_upgrade_is_not_a_revision_upgrade_and_prefers_propers()
+        {
+            Mocker.GetMock<IConfigService>()
+                  .Setup(s => s.DownloadPropersAndRepacks)
+                  .Returns(ProperDownloadTypes.PreferAndUpgrade);
+
+            var movieFile = new MovieFile
+            {
+                Quality = new QualityModel(Quality.HDTV720p, new Revision(version: 2))
+            };
+
+            Mocker.GetMock<IDualAudioImportPreference>()
+                .Setup(s => s.Evaluate(_localMovie, movieFile))
+                .Returns(new DualAudioImportPreferenceResult
+                {
+                    Applies = true,
+                    IsPreferredUpgrade = true
+                });
+
+            _localMovie.Movie.MovieFileId = 1;
+            _localMovie.Movie.MovieFile = movieFile;
+
+            Subject.IsSatisfiedBy(_localMovie, null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
         public void should_return_true_if_not_a_revision_upgrade_and_does_not_prefer_propers()
         {
             Mocker.GetMock<IConfigService>()
