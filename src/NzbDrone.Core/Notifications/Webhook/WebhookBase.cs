@@ -93,7 +93,7 @@ namespace NzbDrone.Core.Notifications.Webhook
                 InstanceName = _configFileProvider.InstanceName,
                 ApplicationUrl = _configService.ApplicationUrl,
                 Movie = GetMovie(movie),
-                AddMethod = movie.AddOptions.AddMethod
+                AddMethod = movie.AddOptions?.AddMethod ?? AddMovieMethod.Manual
             };
         }
 
