@@ -52,6 +52,10 @@ function MovieSearchResult(props: MovieSearchResultProps) {
           {title} {year > 0 ? `(${year})` : ''}
         </div>
 
+        {match.key === 'originalTitle' && originalTitle ? (
+          <div className={styles.originalTitle}>{originalTitle}</div>
+        ) : null}
+
         {alternateTitle ? (
           <div className={styles.alternateTitle}>{alternateTitle.title}</div>
         ) : null}

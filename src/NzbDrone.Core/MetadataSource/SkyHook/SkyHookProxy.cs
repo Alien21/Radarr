@@ -371,9 +371,6 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
 
             var request = requestBuilder.Build();
 
-            request.AllowAutoRedirect = true;
-            request.SuppressHttpError = true;
-
             return _httpClient.Get<List<MovieResource>>(request).Resource;
         }
 
@@ -668,7 +665,6 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
                 }
 
                 var searchTerm = GetSearchTerm(parserTitle);
-
                 var results = SearchMovieResources(searchTerm, yearTerm);
 
                 var movieInfoLanguage = GetMovieInfoLanguageCode();
@@ -803,7 +799,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             {
                 mappedRatings.Tmdb = new RatingChild
                 {
-                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Tmdb.Type),
+                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Tmdb.Type, true),
                     Value = ratings.Tmdb.Value,
                     Votes = ratings.Tmdb.Count
                 };
@@ -813,7 +809,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             {
                 mappedRatings.Imdb = new RatingChild
                 {
-                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Imdb.Type),
+                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Imdb.Type, true),
                     Value = ratings.Imdb.Value,
                     Votes = ratings.Imdb.Count
                 };
@@ -823,7 +819,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             {
                 mappedRatings.Metacritic = new RatingChild
                 {
-                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Metacritic.Type),
+                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Metacritic.Type, true),
                     Value = ratings.Metacritic.Value,
                     Votes = ratings.Metacritic.Count
                 };
@@ -833,7 +829,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             {
                 mappedRatings.RottenTomatoes = new RatingChild
                 {
-                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.RottenTomatoes.Type),
+                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.RottenTomatoes.Type, true),
                     Value = ratings.RottenTomatoes.Value,
                     Votes = ratings.RottenTomatoes.Count
                 };
@@ -843,7 +839,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             {
                 mappedRatings.Trakt = new RatingChild
                 {
-                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Trakt.Type),
+                    Type = (RatingType)Enum.Parse(typeof(RatingType), ratings.Trakt.Type, true),
                     Value = ratings.Trakt.Value,
                     Votes = ratings.Trakt.Count
                 };

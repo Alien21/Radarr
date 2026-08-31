@@ -29,6 +29,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
     }
 
     public class TrackedDownloadService : ITrackedDownloadService,
+                                          IHandle<MovieGrabbedEvent>,
                                           IHandle<MovieAddedEvent>,
                                           IHandle<MovieEditedEvent>,
                                           IHandle<MoviesBulkEditedEvent>,
@@ -36,36 +37,38 @@ namespace NzbDrone.Core.Download.TrackedDownloads
     {
         private readonly IParsingService _parsingService;
         private readonly IHistoryService _historyService;
-        private readonly IEventAggregator _eventAggregator;
         private readonly IDownloadHistoryService _downloadHistoryService;
         private readonly ITrackedDownloadAlreadyImported _trackedDownloadAlreadyImported;
         private readonly IConfigService _config;
         private readonly IRemoteMovieAggregationService _aggregationService;
         private readonly ICustomFormatCalculationService _formatCalculator;
+        private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
+
         private readonly ICached<TrackedDownload> _cache;
 
         public TrackedDownloadService(IParsingService parsingService,
-                                      ICacheManager cacheManager,
                                       IHistoryService historyService,
+                                      IDownloadHistoryService downloadHistoryService,
+                                      ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
                                       IConfigService config,
                                       IRemoteMovieAggregationService aggregationService,
                                       ICustomFormatCalculationService formatCalculator,
                                       IEventAggregator eventAggregator,
-                                      IDownloadHistoryService downloadHistoryService,
-                                      ITrackedDownloadAlreadyImported trackedDownloadAlreadyImported,
+                                      ICacheManager cacheManager,
                                       Logger logger)
         {
             _parsingService = parsingService;
             _historyService = historyService;
-            _cache = cacheManager.GetCache<TrackedDownload>(GetType());
+            _downloadHistoryService = downloadHistoryService;
+            _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
             _config = config;
             _aggregationService = aggregationService;
             _formatCalculator = formatCalculator;
             _eventAggregator = eventAggregator;
-            _downloadHistoryService = downloadHistoryService;
-            _trackedDownloadAlreadyImported = trackedDownloadAlreadyImported;
             _logger = logger;
+
+            _cache = cacheManager.GetCache<TrackedDownload>(GetType());
         }
 
         public TrackedDownload Find(string downloadId)
@@ -135,7 +138,12 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
                 if (parsedMovieInfo != null)
                 {
-                    trackedDownload.RemoteMovie = _parsingService.Map(parsedMovieInfo, "", 0, null);
+                    if (downloadHistory is { EventType: DownloadHistoryEventType.DownloadImported })
+                    {
+                        trackedDownload.RemoteMovie = _parsingService.Map(parsedMovieInfo, downloadHistory.MovieId);
+                    }
+
+                    trackedDownload.RemoteMovie ??= _parsingService.Map(parsedMovieInfo, "", 0, null);
                 }
 
                 if (historyItems.Any())
@@ -204,7 +212,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             catch (Exception e)
             {
                 _logger.Debug(e, "Failed to find movie for " + downloadItem.Title);
-                return null;
+
+                trackedDownload.Warn("Unable to parse movie from title");
             }
 
             LogItemChange(trackedDownload, existingItem?.DownloadItem, trackedDownload.DownloadItem);
@@ -225,6 +234,24 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             foreach (var trackedDownload in untrackable)
             {
                 trackedDownload.IsTrackable = false;
+            }
+        }
+
+        private void LogItemChange(TrackedDownload trackedDownload, DownloadClientItem existingItem, DownloadClientItem downloadItem)
+        {
+            if (existingItem == null ||
+                existingItem.Status != downloadItem.Status ||
+                existingItem.CanBeRemoved != downloadItem.CanBeRemoved ||
+                existingItem.CanMoveFiles != downloadItem.CanMoveFiles)
+            {
+                _logger.Debug("Tracking '{0}:{1}': ClientState={2}{3} RadarrStage={4} Movie='{5}' OutputPath={6}.",
+                    downloadItem.DownloadClientInfo.Name,
+                    downloadItem.Title,
+                    downloadItem.Status,
+                    downloadItem.CanBeRemoved ? "" : downloadItem.CanMoveFiles ? " (busy)" : " (readonly)",
+                    trackedDownload.State,
+                    trackedDownload.RemoteMovie?.ParsedMovieInfo,
+                    downloadItem.OutputPath);
             }
         }
 
@@ -322,21 +349,20 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             return TrackedDownloadState.Downloading;
         }
 
-        private void LogItemChange(TrackedDownload trackedDownload, DownloadClientItem existingItem, DownloadClientItem downloadItem)
+        public void Handle(MovieGrabbedEvent message)
         {
-            if (existingItem == null ||
-                existingItem.Status != downloadItem.Status ||
-                existingItem.CanBeRemoved != downloadItem.CanBeRemoved ||
-                 existingItem.CanMoveFiles != downloadItem.CanMoveFiles)
+            if (message.DownloadId.IsNullOrWhiteSpace())
             {
-                _logger.Debug("Tracking '{0}:{1}': ClientState={2}{3} RadarrStage={4} Movie='{5}' OutputPath={6}.",
-                    downloadItem.DownloadClientInfo.Name,
-                    downloadItem.Title,
-                    downloadItem.Status,
-                    downloadItem.CanBeRemoved ? "" : downloadItem.CanMoveFiles ? " (busy)" : " (readonly)",
-                    trackedDownload.State,
-                    trackedDownload.RemoteMovie?.ParsedMovieInfo,
-                    downloadItem.OutputPath);
+                return;
+            }
+
+            var trackedDownload = _cache.Find(message.DownloadId);
+
+            if (trackedDownload is { State: TrackedDownloadState.Imported or
+                                            TrackedDownloadState.Failed or
+                                            TrackedDownloadState.Ignored })
+            {
+                _cache.Remove(message.DownloadId);
             }
         }
 

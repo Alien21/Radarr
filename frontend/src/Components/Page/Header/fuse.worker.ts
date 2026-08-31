@@ -10,6 +10,7 @@ const fuseOptions = {
   keys: [
     'title',
     'originalTitle',
+    'year',
     'alternateTitles.title',
     'tmdbId',
     'imdbId',
