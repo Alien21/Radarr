@@ -14,7 +14,7 @@ using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.Notifications.Plex.Server
 {
-    public class PlexServer : NotificationBase<PlexServerSettings>
+    public class PlexServer : NotificationBase<PlexServerSettings>, IRecentlyAddedNotification
     {
         private readonly IPlexServerService _plexServerService;
         private readonly IPlexTvService _plexTvService;
@@ -31,6 +31,11 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         public override string Link => "https://www.plex.tv/";
         public override string Name => "Plex Media Server";
+
+        public void MarkAsRecentlyAdded(DownloadMessage message)
+        {
+            _plexServerService.MarkAsRecentlyAdded(message.Movie, Settings);
+        }
 
         public override void OnDownload(DownloadMessage message)
         {

@@ -15,7 +15,8 @@ function ExtensionsSettings(props) {
     allowAutomaticImport,
     parseTmdbIdFromReleaseName,
     blockAutoImportForExistingMovieFiles,
-    analyzeCompletedDownloadFiles
+    analyzeCompletedDownloadFiles,
+    markImportedMediaAsRecentlyAdded
   } = settings;
 
   return (
@@ -77,6 +78,17 @@ function ExtensionsSettings(props) {
           helpText={translate('AnalyzeCompletedDownloadFilesHelpText')}
           onChange={onInputChange}
           {...analyzeCompletedDownloadFiles}
+        />
+      </FormGroup>
+      <FormGroup size={sizes.MEDIUM}>
+        <FormLabel>{translate('MarkImportedMediaAsRecentlyAdded')}</FormLabel>
+
+        <FormInputGroup
+          type={inputTypes.CHECK}
+          name="markImportedMediaAsRecentlyAdded"
+          helpText={translate('MarkImportedMediaAsRecentlyAddedHelpText')}
+          onChange={onInputChange}
+          {...markImportedMediaAsRecentlyAdded}
         />
       </FormGroup>
     </FieldSet>

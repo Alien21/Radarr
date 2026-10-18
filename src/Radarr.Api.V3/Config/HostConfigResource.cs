@@ -35,6 +35,7 @@ namespace Radarr.Api.V3.Config
         public bool UpdateAutomatically { get; set; }
         public UpdateMechanism UpdateMechanism { get; set; }
         public string UpdateScriptPath { get; set; }
+        public bool MarkImportedMediaAsRecentlyAdded { get; set; }
         public bool ParseTmdbIdFromReleaseName { get; set; }
         public bool BlockAutoImportForExistingMovieFiles { get; set; }
         public bool AnalyzeCompletedDownloadFiles { get; set; }
@@ -87,6 +88,7 @@ namespace Radarr.Api.V3.Config
                 UpdateAutomatically = model.UpdateAutomatically,
                 UpdateMechanism = model.UpdateMechanism,
                 UpdateScriptPath = model.UpdateScriptPath,
+                MarkImportedMediaAsRecentlyAdded = configService.MarkImportedMediaAsRecentlyAdded,
                 ParseTmdbIdFromReleaseName = configService.ParseTmdbIdFromReleaseName,
                 BlockAutoImportForExistingMovieFiles = configService.BlockAutoImportForExistingMovieFiles,
                 AnalyzeCompletedDownloadFiles = configService.AnalyzeCompletedDownloadFiles,

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.HealthCheck;
 using NzbDrone.Core.MediaFiles.Events;
@@ -33,12 +34,14 @@ namespace NzbDrone.Core.Notifications
     {
         private readonly INotificationFactory _notificationFactory;
         private readonly INotificationStatusService _notificationStatusService;
+        private readonly IConfigService _configService;
         private readonly Logger _logger;
 
-        public NotificationService(INotificationFactory notificationFactory, INotificationStatusService notificationStatusService, Logger logger)
+        public NotificationService(INotificationFactory notificationFactory, INotificationStatusService notificationStatusService, IConfigService configService, Logger logger)
         {
             _notificationFactory = notificationFactory;
             _notificationStatusService = notificationStatusService;
+            _configService = configService;
             _logger = logger;
         }
 
@@ -158,6 +161,18 @@ namespace NzbDrone.Core.Notifications
                 {
                     if (ShouldHandleMovie(notification.Definition, message.MovieInfo.Movie))
                     {
+                        if (_configService.MarkImportedMediaAsRecentlyAdded && notification is IRecentlyAddedNotification recentlyAdded)
+                        {
+                            try
+                            {
+                                recentlyAdded.MarkAsRecentlyAdded(downloadMessage);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Warn(ex, "Unable to mark imported movie as recently added for: {0}", notification.Definition.Name);
+                            }
+                        }
+
                         if (downloadMessage.OldMovieFiles.Empty() || ((NotificationDefinition)notification.Definition).OnUpgrade)
                         {
                             notification.OnDownload(downloadMessage);

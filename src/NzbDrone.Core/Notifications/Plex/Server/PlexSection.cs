@@ -21,6 +21,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         public string Type { get; set; }
         public string Language { get; set; }
+        public string Agent { get; set; }
 
         [JsonProperty("Location")]
         public List<PlexSectionLocation> Locations { get; set; }
@@ -44,6 +45,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         public string Type { get; set; }
         public string Language { get; set; }
+        public string Agent { get; set; }
 
         [JsonProperty("_children")]
         public List<PlexSectionLocation> Locations { get; set; }

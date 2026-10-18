@@ -2077,5 +2077,7 @@
   "YesCancel": "Yes, Cancel",
   "Yesterday": "Yesterday",
   "YesterdayAt": "Yesterday at {time}",
-  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`"
+  "YouCanAlsoSearch": "You can also search using TMDb ID or IMDb ID of a movie. e.g. `tmdb:71663`",
+  "MarkImportedMediaAsRecentlyAdded": "Mark Imported Movies as Recently Added",
+  "MarkImportedMediaAsRecentlyAddedHelpText": "Update the added date of existing movies in configured Plex and Emby/Jellyfin connections after successful imports, including replacements. Connections must have On Import enabled and matching tags. This also applies when On Upgrade is disabled; notification and library refresh settings are preserved."
 }

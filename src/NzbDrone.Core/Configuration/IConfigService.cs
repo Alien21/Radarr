@@ -92,6 +92,7 @@ namespace NzbDrone.Core.Configuration
         string HmacSalt { get; }
 
         // Extensions
+        bool MarkImportedMediaAsRecentlyAdded { get; }
         bool ParseTmdbIdFromReleaseName { get; }
         bool BlockAutoImportForExistingMovieFiles { get; }
         bool AnalyzeCompletedDownloadFiles { get; }

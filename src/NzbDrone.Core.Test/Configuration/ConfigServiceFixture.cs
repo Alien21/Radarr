@@ -121,5 +121,30 @@ namespace NzbDrone.Core.Test.Configuration
 
             Mocker.GetMock<IConfigRepository>().Verify(c => c.Upsert("downloadedepisodesfolder", It.IsAny<string>()), Times.Never());
         }
+
+        [Test]
+        public void recently_added_imports_should_be_disabled_by_default()
+        {
+            Subject.MarkImportedMediaAsRecentlyAdded.Should().BeFalse();
+        }
+
+        [Test]
+        public void recently_added_imports_should_save_and_reload_both_values()
+        {
+            var values = new List<Config>();
+            Mocker.GetMock<IConfigRepository>().Setup(r => r.All()).Returns(() => values);
+            Mocker.GetMock<IConfigRepository>().Setup(r => r.Upsert(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<string, string>((key, value) =>
+                {
+                    values.RemoveAll(c => c.Key == key);
+                    values.Add(new Config { Key = key, Value = value });
+                });
+
+            foreach (var enabled in new[] { true, false })
+            {
+                Subject.SaveConfigDictionary(new Dictionary<string, object> { { "MarkImportedMediaAsRecentlyAdded", enabled } });
+                Subject.MarkImportedMediaAsRecentlyAdded.Should().Be(enabled);
+            }
+        }
     }
 }

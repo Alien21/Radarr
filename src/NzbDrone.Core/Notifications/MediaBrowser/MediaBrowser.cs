@@ -9,7 +9,7 @@ using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.Notifications.Emby
 {
-    public class MediaBrowser : NotificationBase<MediaBrowserSettings>
+    public class MediaBrowser : NotificationBase<MediaBrowserSettings>, IRecentlyAddedNotification
     {
         private readonly IMediaBrowserService _mediaBrowserService;
         private readonly MediaServerUpdateQueue<MediaBrowser, string> _updateQueue;
@@ -35,6 +35,11 @@ namespace NzbDrone.Core.Notifications.Emby
             {
                 _mediaBrowserService.Notify(Settings, MOVIE_GRABBED_TITLE_BRANDED, grabMessage.Message);
             }
+        }
+
+        public void MarkAsRecentlyAdded(DownloadMessage message)
+        {
+            _mediaBrowserService.MarkAsRecentlyAdded(Settings, message.Movie);
         }
 
         public override void OnDownload(DownloadMessage message)

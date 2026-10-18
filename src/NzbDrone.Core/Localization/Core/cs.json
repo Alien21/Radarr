@@ -1605,5 +1605,7 @@
     "DownloadClientQbittorrentValidationCategoryRecommendedDetail": "{appName} se nepokusí importovat dokončená stahování bez kategorie.",
     "DownloadClientQbittorrentValidationCategoryUnsupportedDetail": "qBittorrent do verze 3.3.0 nepodporoval kategorie. Prosím aktualizujte ho, nebo to zkuste znova s prázdnou kategorií.",
     "DownloadClientQbittorrentValidationQueueingNotEnabled": "Fronta není povolená",
-    "UnknownDownloadState": "Neznámý stav stahování: {state}"
+    "UnknownDownloadState": "Neznámý stav stahování: {state}",
+    "MarkImportedMediaAsRecentlyAdded": "Označit importované filmy jako nově přidané",
+    "MarkImportedMediaAsRecentlyAddedHelpText": "Po úspěšném importu včetně nahrazení změní datum přidání existujících filmů v nastavených připojeních Plex a Emby/Jellyfin. Připojení musí mít zapnutou událost Při importu a odpovídající štítky. Funguje i při vypnuté události Při upgradu; nastavení oznámení a obnovování knihovny zůstávají zachovaná."
 }

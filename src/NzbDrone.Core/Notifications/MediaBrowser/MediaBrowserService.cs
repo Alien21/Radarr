@@ -13,6 +13,7 @@ namespace NzbDrone.Core.Notifications.Emby
 {
     public interface IMediaBrowserService
     {
+        void MarkAsRecentlyAdded(MediaBrowserSettings settings, Movie movie);
         void Notify(MediaBrowserSettings settings, string title, string message);
         void Update(MediaBrowserSettings settings, Movie movie, string updateType);
         ValidationFailure Test(MediaBrowserSettings settings);
@@ -29,6 +30,11 @@ namespace NzbDrone.Core.Notifications.Emby
             _proxy = proxy;
             _localizationService = localizationService;
             _logger = logger;
+        }
+
+        public void MarkAsRecentlyAdded(MediaBrowserSettings settings, Movie movie)
+        {
+            _proxy.MarkAsRecentlyAdded(settings, movie);
         }
 
         public void Notify(MediaBrowserSettings settings, string title, string message)
