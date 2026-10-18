@@ -178,7 +178,7 @@ namespace NzbDrone.Mono.Disk
             try
             {
                 mounts.AddRange(GetDriveInfoMounts()
-                    .Where(d => d.DriveType == DriveType.Fixed && !d.RootDirectory.FullName.StartsWithIgnoreCase("/run/"))
+                    .Where(d => d.DriveType == DriveType.Fixed && !d.RootDirectory.FullName.StartsWith("/run/", StringComparison.OrdinalIgnoreCase))
                     .Select(d =>
                     {
                         try
