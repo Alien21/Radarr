@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
@@ -225,7 +228,9 @@ namespace NzbDrone.Core.Test.Download
                 .Verify(v => v.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()), Times.Never());
 
             AssertNotImported();
-            ExceptionVerification.ExpectedWarns(1);
+            _trackedDownload.Status.Should().Be(TrackedDownloadStatus.Warning);
+            _trackedDownload.StatusMessages.SelectMany(s => s.Messages)
+                .Should().ContainSingle("Auto-import blocked: one or more matched movies already have files in library.");
         }
 
         [Test]
@@ -277,6 +282,8 @@ namespace NzbDrone.Core.Test.Download
                   .Setup(s => s.GetFileSize(sourcePath))
                   .Returns(fileSize);
 
+            _trackedDownload.Warn("Previous import failure");
+
             Subject.Import(_trackedDownload);
 
             Mocker.GetMock<IDownloadedMovieImportService>()
@@ -286,6 +293,8 @@ namespace NzbDrone.Core.Test.Download
                   .Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Once());
 
             _trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
+            _trackedDownload.Status.Should().Be(TrackedDownloadStatus.Ok);
+            _trackedDownload.StatusMessages.Should().BeEmpty();
         }
 
         [Test]
@@ -457,6 +466,67 @@ namespace NzbDrone.Core.Test.Download
 
             AssertNotImported();
             ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_retry_import_after_unexpected_disk_failure()
+        {
+            var exception = new IOException("No space left on device");
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .SetupSequence(s => s.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()))
+                .Throws(exception)
+                .Returns(new List<ImportResult>
+                {
+                    new ImportResult(new ImportDecision(new LocalMovie { Movie = _trackedDownload.RemoteMovie.Movie }))
+                });
+
+            Assert.Throws<IOException>(() => Subject.Import(_trackedDownload)).Should().BeSameAs(exception);
+
+            _trackedDownload.State.Should().Be(TrackedDownloadState.ImportPending);
+            _trackedDownload.Status.Should().Be(TrackedDownloadStatus.Warning);
+            _trackedDownload.StatusMessages[0].Messages.Should().ContainSingle("Import failed and will be retried: No space left on device");
+
+            Subject.Import(_trackedDownload);
+
+            _trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
+            _trackedDownload.Status.Should().Be(TrackedDownloadStatus.Ok);
+            _trackedDownload.StatusMessages.Should().BeEmpty();
+            Mocker.GetMock<IEventAggregator>()
+                .Verify(s => s.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Once());
+        }
+
+        [Test]
+        public void should_release_importing_state_if_import_verification_throws()
+        {
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Setup(s => s.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()))
+                .Returns(new List<ImportResult>());
+            Mocker.GetMock<IHistoryService>()
+                .Setup(s => s.FindByDownloadId(_trackedDownload.DownloadItem.DownloadId))
+                .Throws(new IOException("History unavailable"));
+
+            Assert.Throws<IOException>(() => Subject.Import(_trackedDownload));
+
+            _trackedDownload.State.Should().Be(TrackedDownloadState.ImportPending);
+            _trackedDownload.StatusMessages[0].Messages.Should().ContainSingle("Import failed and will be retried: History unavailable");
+        }
+
+        [Test]
+        public void should_preserve_imported_state_if_completion_event_throws()
+        {
+            Mocker.GetMock<IDownloadedMovieImportService>()
+                .Setup(s => s.ProcessPath(It.IsAny<string>(), It.IsAny<ImportMode>(), It.IsAny<Movie>(), It.IsAny<DownloadClientItem>()))
+                .Returns(new List<ImportResult>
+                {
+                    new ImportResult(new ImportDecision(new LocalMovie { Movie = _trackedDownload.RemoteMovie.Movie }))
+                });
+            Mocker.GetMock<IEventAggregator>()
+                .Setup(s => s.PublishEvent(It.IsAny<DownloadCompletedEvent>()))
+                .Throws(new InvalidOperationException("Notification failed"));
+
+            Assert.Throws<InvalidOperationException>(() => Subject.Import(_trackedDownload));
+
+            _trackedDownload.State.Should().Be(TrackedDownloadState.Imported);
         }
 
         private void AssertNotImported()

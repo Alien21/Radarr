@@ -355,17 +355,31 @@ namespace NzbDrone.Core.Download
                 return;
             }
 
+            var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
+            List<ImportResult> importResults;
             trackedDownload.State = TrackedDownloadState.Importing;
 
-            var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
-            var importResults = _downloadedMovieImportService.ProcessPath(outputPath,
-                ImportMode.Auto,
-                trackedDownload.RemoteMovie.Movie,
-                trackedDownload.ImportItem);
-
-            if (VerifyImport(trackedDownload, importResults))
+            try
             {
-                return;
+                importResults = _downloadedMovieImportService.ProcessPath(outputPath,
+                    ImportMode.Auto,
+                    trackedDownload.RemoteMovie.Movie,
+                    trackedDownload.ImportItem);
+
+                if (VerifyImport(trackedDownload, importResults))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trackedDownload.State == TrackedDownloadState.Importing)
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportPending;
+                    trackedDownload.Warn("Import failed and will be retried: {0}", ex.Message);
+                }
+
+                throw;
             }
 
             trackedDownload.State = TrackedDownloadState.ImportPending;
@@ -420,6 +434,7 @@ namespace NzbDrone.Core.Download
             {
                 _logger.Debug("All movies were imported for {0}", trackedDownload.DownloadItem.Title);
                 trackedDownload.State = TrackedDownloadState.Imported;
+                trackedDownload.ClearStatus();
                 _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, trackedDownload.RemoteMovie.Movie.Id));
                 return true;
             }
@@ -456,6 +471,7 @@ namespace NzbDrone.Core.Download
                 }
 
                 trackedDownload.State = TrackedDownloadState.Imported;
+                trackedDownload.ClearStatus();
                 _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, trackedDownload.RemoteMovie.Movie.Id));
 
                 return true;
@@ -573,6 +589,7 @@ namespace NzbDrone.Core.Download
             _logger.Debug("All movies were imported in history for {0}", trackedDownload.DownloadItem.Title);
 
             trackedDownload.State = TrackedDownloadState.Imported;
+            trackedDownload.ClearStatus();
             _eventAggregator.PublishEvent(new DownloadCompletedEvent(trackedDownload, trackedDownload.RemoteMovie.Movie.Id));
 
             return true;

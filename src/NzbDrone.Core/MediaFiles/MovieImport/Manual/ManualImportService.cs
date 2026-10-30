@@ -431,6 +431,39 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 
         public void Execute(ManualImportCommand message)
         {
+            var trackedDownloads = new HashSet<TrackedDownload>();
+
+            try
+            {
+                ImportFiles(message, trackedDownloads);
+            }
+            catch (Exception ex)
+            {
+                foreach (var trackedDownload in trackedDownloads.Where(t => t.State == TrackedDownloadState.Importing))
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn("Manual import failed: {0}", ex.Message);
+                }
+
+                throw;
+            }
+            finally
+            {
+                foreach (var trackedDownload in trackedDownloads.Where(t => t.State == TrackedDownloadState.Importing))
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn("One or more movies expected in this release were not imported or missing");
+                }
+
+                if (trackedDownloads.Any())
+                {
+                    _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(_trackedDownloadService.GetTrackedDownloads()));
+                }
+            }
+        }
+
+        private void ImportFiles(ManualImportCommand message, HashSet<TrackedDownload> trackedDownloads)
+        {
             _logger.ProgressTrace("Manually importing {0} files using mode {1}", message.Files.Count, message.ImportMode);
 
             var imported = new List<ImportResult>();
@@ -498,6 +531,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 }
                 else
                 {
+                    trackedDownloads.Add(trackedDownload);
                     UpdateTrackedDownloadForManualImport(trackedDownload, localMovie);
 
                     var importResult = _importApprovedMovie.Import(new List<ImportDecision> { importDecision }, true, trackedDownload.DownloadItem, message.ImportMode).First();
@@ -512,7 +546,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 }
             }
 
-            _logger.ProgressTrace("Manually imported {0} files", imported.Count);
+            _logger.ProgressTrace("Manually imported {0} files", imported.Count(i => i.Result == ImportResultType.Imported));
 
             foreach (var groupedTrackedDownload in importedTrackedDownload.GroupBy(i => i.TrackedDownload.DownloadItem.DownloadId).ToList())
             {
@@ -520,6 +554,16 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
 
                 var importMovie = groupedTrackedDownload.First().ImportResult.ImportDecision.LocalMovie.Movie;
                 var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
+
+                if (!groupedTrackedDownload.Any(c => c.ImportResult.Result == ImportResultType.Imported))
+                {
+                    trackedDownload.State = TrackedDownloadState.ImportBlocked;
+                    trackedDownload.Warn(groupedTrackedDownload
+                        .Select(c => new TrackedDownloadStatusMessage(Path.GetFileName(c.ImportResult.ImportDecision.LocalMovie.Path), c.ImportResult.Errors))
+                        .ToArray());
+
+                    continue;
+                }
 
                 if (_diskProvider.FolderExists(outputPath))
                 {
