@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Languages;
@@ -125,7 +126,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         {
             var languages = new AudioLanguageSet();
 
-            foreach (var audioLanguage in mediaInfo?.AudioLanguages ?? new List<string>())
+            foreach (var audioLanguage in mediaInfo?.AudioStreams?.Select(stream => stream.Language) ?? Enumerable.Empty<string>())
             {
                 AddRawLanguage(languages, audioLanguage);
             }

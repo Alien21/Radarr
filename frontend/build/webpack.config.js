@@ -98,7 +98,8 @@ module.exports = (env) => {
         template: 'frontend/src/index.ejs',
         filename: 'index.html',
         publicPath: '/',
-        inject: false
+        inject: false,
+        minify: false
       }),
 
       new FileManagerPlugin({
@@ -176,7 +177,7 @@ module.exports = (env) => {
                       loose: true,
                       debug: false,
                       useBuiltIns: 'entry',
-                      corejs: '3.42'
+                      corejs: '3.50'
                     }
                   ]
                 ]

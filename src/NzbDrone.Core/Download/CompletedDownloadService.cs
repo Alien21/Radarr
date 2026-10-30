@@ -803,7 +803,7 @@ namespace NzbDrone.Core.Download
         {
             var languages = new AudioLanguageSet();
 
-            foreach (var audioLanguage in mediaInfo?.AudioLanguages ?? new List<string>())
+            foreach (var audioLanguage in mediaInfo?.AudioStreams?.Select(stream => stream.Language) ?? Enumerable.Empty<string>())
             {
                 AddRawLanguage(languages, audioLanguage);
             }
@@ -902,8 +902,8 @@ namespace NzbDrone.Core.Download
                     FormatValues(localMovie.Languages),
                     FormatValues(trackedDownload.AnalyzedSubtitleLanguages),
                     mediaInfo?.Title ?? "none",
-                    FormatValues(mediaInfo?.AudioLanguages),
-                    FormatValues(mediaInfo?.Subtitles),
+                    FormatValues(mediaInfo?.AudioStreams?.Select(stream => stream.Language)),
+                    FormatValues(mediaInfo?.SubtitleStreams?.Select(stream => stream.Language)),
                     FormatExternalSubtitleFiles(externalSubtitles));
             }
             catch (System.Exception ex)
@@ -1056,7 +1056,8 @@ namespace NzbDrone.Core.Download
         {
             var languages = new List<Language>();
 
-            var embeddedSubtitleLanguages = localMovie.MediaInfo?.Subtitles?
+            var embeddedSubtitleLanguages = localMovie.MediaInfo?.SubtitleStreams?
+                                                      .Select(stream => stream.Language)
                                                       .Where(language => language.IsNotNullOrWhiteSpace())
                                                       .Distinct()
                                                       .ToList() ?? new List<string>();

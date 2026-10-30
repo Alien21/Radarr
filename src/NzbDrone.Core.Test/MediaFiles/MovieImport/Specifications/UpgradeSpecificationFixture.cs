@@ -335,5 +335,44 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Specifications
             result.Accepted.Should().BeFalse();
             result.Reason.Should().Be(ImportRejectionReason.DualAudioUpgradeManualReview);
         }
+
+        [Test]
+        public void should_return_false_and_a_specific_reason_if_not_upgrade_to_custom_format_score_after_local_file_rename_but_was_before()
+        {
+            var movieFileCustomFormats = Builder<CustomFormat>.CreateListOfSize(1).Build().ToList();
+
+            var movieFile = new MovieFile
+            {
+                Quality = new QualityModel(Quality.Bluray1080p)
+            };
+
+            _movie.QualityProfile.FormatItems = movieFileCustomFormats.Select(c => new ProfileFormatItem
+                {
+                    Format = c,
+                    Score = 50
+                })
+                .ToList();
+
+            Mocker.GetMock<IConfigService>()
+                .Setup(s => s.DownloadPropersAndRepacks)
+                .Returns(ProperDownloadTypes.DoNotPrefer);
+
+            Mocker.GetMock<ICustomFormatCalculationService>()
+                .Setup(s => s.ParseCustomFormat(movieFile))
+                .Returns(movieFileCustomFormats);
+
+            _localMovie.Quality = new QualityModel(Quality.Bluray1080p);
+            _localMovie.CustomFormats = Builder<CustomFormat>.CreateListOfSize(1).Build().ToList();
+            _localMovie.CustomFormatScore = 20;
+            _localMovie.OriginalFileNameCustomFormats = Builder<CustomFormat>.CreateListOfSize(1).Build().ToList();
+            _localMovie.OriginalFileNameCustomFormatScore = 60;
+
+            _localMovie.Movie.MovieFileId = 1;
+            _localMovie.Movie.MovieFile = movieFile;
+
+            var result = Subject.IsSatisfiedBy(_localMovie, null);
+            result.Accepted.Should().BeFalse();
+            result.Reason.Should().Be(ImportRejectionReason.NotCustomFormatUpgradeAfterRename);
+        }
     }
 }

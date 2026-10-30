@@ -119,7 +119,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             _localMovie.Languages = new List<Language> { Language.Czech };
             _localMovie.MediaInfo = new MediaInfoModel
             {
-                AudioLanguages = new List<string> { "ces", "pirate" }
+                AudioStreams = new List<MediaInfoAudioStreamModel> { new() { Language = "ces" }, new() { Language = "pirate" } }
             };
 
             var result = Subject.Evaluate(_localMovie, _existingMovieFile);
